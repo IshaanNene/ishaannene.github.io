@@ -1,0 +1,22 @@
+{
+  "$comment": "Single source of truth for the archipelago layout. Read by scripts/blender/*.py (asset generation) and src/config/world.ts (runtime). Positions are three.js world coordinates (Y up). After editing, re-run `npm run assets` so bridges and ports are regenerated.",
+  "islands": [
+    { "id": "about",      "position": [0, 0, 0],      "radius": 10.5, "seed": 11, "depth": 9.5 },
+    { "id": "projects",   "position": [29, -1.5, -5], "radius": 7.6,  "seed": 23, "depth": 7.5 },
+    { "id": "blogs",      "position": [13, 2, -27],   "radius": 8.0,  "seed": 37, "depth": 8.0 },
+    { "id": "research",   "position": [-16, 3, -25],  "radius": 7.4,  "seed": 41, "depth": 7.5 },
+    { "id": "playground", "position": [-30, -0.5, -3],"radius": 7.0,  "seed": 53, "depth": 6.5 },
+    { "id": "resume",     "position": [-14, -2, 23],  "radius": 7.8,  "seed": 67, "depth": 7.0 },
+    { "id": "contact",    "position": [16, -3, 23],   "radius": 7.6,  "seed": 79, "depth": 6.5 }
+  ],
+  "bridges": [
+    { "from": "about", "to": "projects",   "type": "truss" },
+    { "from": "about", "to": "blogs",      "type": "arch" },
+    { "from": "about", "to": "research",   "type": "suspension" },
+    { "from": "about", "to": "playground", "type": "plank" },
+    { "from": "about", "to": "resume",     "type": "arch" },
+    { "from": "about", "to": "contact",    "type": "suspension" },
+    { "from": "blogs", "to": "research",   "type": "plank" },
+    { "from": "projects", "to": "contact", "type": "truss" }
+  ]
+}
