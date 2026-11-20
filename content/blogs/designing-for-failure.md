@@ -4,10 +4,6 @@ date: 2026-07-02
 excerpt: Resilience is not a feature you add at the end. It is the shape of the system from the first diagram.
 tags: [architecture, reliability]
 featured: true
-visual:
-  material: granite
-  typography: carved-display
-  objectType: monument
 ---
 
 Every system fails. The only question is whether it fails in a way you designed.

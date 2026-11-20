@@ -18,7 +18,7 @@ export const SITE = {
   ],
   contact: [
     { id: "email", label: "Email", value: "hello@example.com", href: "mailto:hello@example.com", material: "wood", typography: "engraved-sans" },
-    { id: "github", label: "GitHub", value: "github.com/IshaanNene", href: "https://github.com/IshaanNene", material: "metal", typography: "embossed-sans" },
+    { id: "github", label: "GitHub", value: "github.com/IshaanNene", href: "https://github.com/IshaanNene", material: "steel", typography: "engraved-sans" },
     { id: "linkedin", label: "LinkedIn", value: "linkedin.com/in/", href: "https://www.linkedin.com/", material: "corten", typography: "stencil-mono" },
   ],
 } as const;

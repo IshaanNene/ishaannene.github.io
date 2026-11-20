@@ -7,9 +7,6 @@ excerpt: Clocks lie, networks partition and every node is a liar until proven ot
 tags: [distributed-systems, consensus, reliability]
 featured: true
 visual:
-  material: stone
-  typography: engraved-serif
-  objectType: slab
   placement: auto
 ---
 

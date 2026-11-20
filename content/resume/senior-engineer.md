@@ -7,10 +7,6 @@ date: 2024-06-01
 excerpt: Led the streaming platform team; cut ingestion cost 42% while tripling throughput.
 tags: [leadership, streaming]
 featured: true
-visual:
-  material: concrete
-  typography: embossed-sans
-  objectType: wall
 ---
 
 - Led a team of six building the company's event streaming platform.

@@ -8,8 +8,9 @@
  *   etched / painted → near-flush thin lettering
  */
 import { Center, Text3D } from "@react-three/drei";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import type * as THREE from "three";
+import { GrassFur } from "./organic";
 import { FONT_URLS, wrapLines, type TypographyPreset } from "@/presets/typography";
 
 export interface ThreeDTypographyProps {
@@ -27,7 +28,7 @@ export interface ThreeDTypographyProps {
   align?: "center" | "left";
 }
 
-const GLYPH_ASPECT: Record<string, number> = { serif: 0.62, sans: 0.66, mono: 0.62, display: 0.7 };
+const GLYPH_ASPECT: Record<string, number> = { serif: 0.62, sans: 0.66, mono: 0.62, display: 0.7, roman: 0.86, brush: 0.52, heavy: 0.84, rounded: 0.62 };
 
 export function layoutText(text: string, preset: TypographyPreset, width: number, size: number, maxLines = 3, wrap?: number) {
   const t = preset.uppercase ? text.toUpperCase() : text;
@@ -48,23 +49,35 @@ export function ThreeDTypography({ text, preset, material, width, size, maxLines
     <group position={position} rotation={rotation}>
       {lines.map((line, i) => (
         <Center key={i} disableY disableZ position={[0, -i * lead, zOffset]}>
-          <Text3D
-            font={FONT_URLS[preset.font]}
-            size={s}
-            height={height}
-            curveSegments={preset.font === "mono" ? 3 : 5}
-            bevelEnabled={preset.bevel > 0}
-            bevelThickness={preset.bevel * s}
-            bevelSize={preset.bevel * s * 0.6}
-            bevelSegments={preset.treatment === "grown" ? 3 : 1}
-            material={material}
-            castShadow={preset.treatment !== "engraved"}
-            receiveShadow
-          >
-            {line}
-          </Text3D>
+          <TextLine line={line} preset={preset} size={s} height={height} material={material} />
         </Center>
       ))}
     </group>
+  );
+}
+
+function TextLine({ line, preset, size, height, material }: { line: string; preset: TypographyPreset; size: number; height: number; material: THREE.Material }) {
+  const ref = useRef<THREE.Mesh>(null);
+  const grown = preset.treatment === "grown";
+  return (
+    <>
+      <Text3D
+        ref={ref}
+        font={FONT_URLS[preset.font]}
+        size={size}
+        height={height}
+        curveSegments={preset.font === "mono" ? 3 : 6}
+        bevelEnabled={preset.bevel > 0}
+        bevelThickness={preset.bevel * size}
+        bevelSize={preset.bevel * size * 0.6}
+        bevelSegments={grown ? 3 : 2}
+        material={material}
+        castShadow={preset.treatment !== "engraved"}
+        receiveShadow
+      >
+        {line}
+      </Text3D>
+      {grown && <GrassFur target={ref} length={size * 0.11} density={2200} key={line} />}
+    </>
   );
 }

@@ -76,6 +76,9 @@ export function MaterialContentObject({
   const lead = title.size * typo.lineHeight;
   const blockH = (title.lines.length - 1) * lead;
   const showSub = shape.subtitle && item.subtitle;
+  // "bottom" anchors the last line's baseline at t.y (letters standing on the ground)
+  const anchorY = t.anchor === "bottom" ? blockH / 2 : 0;
+  const seed = useMemo(() => [...item.id].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7) % 9973, [item.id]);
 
   useFrame((_, dt) => {
     if (!group.current) return;
@@ -118,13 +121,13 @@ export function MaterialContentObject({
       {item.modelPath ? (
         <ModelBoundary fallback={fallback}>
           <Suspense fallback={fallback}>
-            <Shape body={body} accent={accentMaterial} plinth={plinth} modelPath={item.modelPath} />
+            <Shape body={body} accent={accentMaterial} plinth={plinth} modelPath={item.modelPath} seed={seed} />
           </Suspense>
         </ModelBoundary>
       ) : (
-        <Shape body={body} accent={accentMaterial} plinth={plinth} />
+        <Shape body={body} accent={accentMaterial} plinth={plinth} seed={seed} />
       )}
-      <group position={[0, t.y, t.pivotZ ?? 0]} rotation={[t.tilt ?? 0, 0, 0]}>
+      <group position={[0, t.y + anchorY, t.pivotZ ?? 0]} rotation={[t.tilt ?? 0, 0, 0]}>
         <Suspense fallback={null}>
           <ThreeDTypography
             text={item.title}

@@ -25,7 +25,9 @@ let before = 0;
 let after = 0;
 for (const file of walk(root)) {
   const size = statSync(file).size;
-  const head = readFileSync(file).subarray(0, 4096).toString("latin1");
+  const buf = readFileSync(file);
+  // GLB: 12-byte header, then the JSON chunk (length at byte 12)
+  const head = buf.subarray(20, 20 + buf.readUInt32LE(12)).toString("utf8");
   if (!force && head.includes("EXT_meshopt_compression")) {
     console.log(`skip  ${file.replace(root, "")} (already compressed)`);
     continue;

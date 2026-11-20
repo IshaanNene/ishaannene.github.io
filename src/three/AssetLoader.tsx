@@ -9,7 +9,7 @@ import { useGLTF } from "@react-three/drei";
 import { useMemo } from "react";
 import * as THREE from "three";
 import { MeshBVH, acceleratedRaycast } from "three-mesh-bvh";
-import { MaterialSet, materialKey } from "./materials";
+import { MaterialSet, isScanned, materialKey, scannedMaterial } from "./materials";
 import { getWaterMaterial, createWaterfallMaterial } from "./water";
 
 export interface IslandNodes {
@@ -40,15 +40,21 @@ function ensureBVH(geo: THREE.BufferGeometry) {
 export function prepareObject(
   obj: THREE.Object3D,
   mats: MaterialSet,
-  opts: { castShadow?: boolean; receiveShadow?: boolean; raycast?: boolean; waterfallHeight?: number } = {},
+  opts: { castShadow?: boolean; receiveShadow?: boolean; raycast?: boolean; waterfallHeight?: number; cliff?: boolean } = {},
 ) {
   obj.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
     const src = mesh.material as THREE.Material;
-    const key = materialKey(src);
+    let key = materialKey(src);
+    // rock underside gets the scanned cliff texture instead of the building stone
+    if (opts.cliff && (key === "soil" || key.startsWith("stone_"))) key = `cliff_${key}`;
     const hasColor = !!mesh.geometry.attributes.color;
-    if (key === "water") {
+    if (isScanned(src)) {
+      mesh.material = scannedMaterial(src, hasColor);
+      mesh.castShadow = opts.castShadow ?? true;
+      mesh.receiveShadow = opts.receiveShadow ?? true;
+    } else if (key === "water") {
       mesh.material = opts.waterfallHeight ? createWaterfallMaterial(opts.waterfallHeight) : getWaterMaterial();
       mesh.castShadow = false;
       mesh.receiveShadow = false;
@@ -104,7 +110,8 @@ export function useIslandNodes(url: string, mats: MaterialSet): IslandNodes {
         prepareObject(child, mats, { castShadow: false });
         nodes.terrain.push(child);
       } else if (n.startsWith("foundation")) {
-        prepareObject(child, mats, { castShadow: true });
+        // the underside's shadow falls into open sky: casting it only costs a shadow-pass draw
+        prepareObject(child, mats, { castShadow: false, cliff: true });
         nodes.foundation.push(child);
       } else if (n.startsWith("buildings")) {
         prepareObject(child, mats);
@@ -113,7 +120,7 @@ export function useIslandNodes(url: string, mats: MaterialSet): IslandNodes {
         prepareObject(child, mats);
         nodes.landmarks.push(child);
       } else if (n.startsWith("props")) {
-        prepareObject(child, mats, { raycast: false });
+        prepareObject(child, mats, { raycast: false, castShadow: false });
         nodes.props.push(child);
       } else {
         prepareObject(child, mats);

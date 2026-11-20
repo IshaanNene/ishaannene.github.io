@@ -3,7 +3,8 @@
  * and their editorial counterparts. Add a preset here to make it available to
  * every content object; no renderer changes required.
  */
-export type FontFace3D = "serif" | "sans" | "mono" | "display";
+/** serif/sans/mono/display: three.js sample faces · roman: Cinzel Bold · brush: Bangers · heavy: Archivo Black · rounded: Fredoka Bold */
+export type FontFace3D = "serif" | "sans" | "mono" | "display" | "roman" | "brush" | "heavy" | "rounded";
 
 /**
  * engraved — dark inlay set into the surface (carved look)
@@ -38,9 +39,18 @@ export const FONT_URLS: Record<FontFace3D, string> = {
   sans: "/fonts/sans-bold.json",
   mono: "/fonts/mono.json",
   display: "/fonts/display-bold.json",
+  roman: "/fonts/cinzel-bold.json",
+  brush: "/fonts/bangers.json",
+  heavy: "/fonts/archivo-black.json",
+  rounded: "/fonts/fredoka-bold.json",
 };
 
 export const TYPOGRAPHY_PRESETS: Record<string, TypographyPreset> = {
+  "carved-roman": { id: "carved-roman", label: "Carved Roman capitals", font: "roman", treatment: "engraved", depth: 0.16, bevel: 0.02, uppercase: true, wrap: 14, lineHeight: 1.36, inkMaterial: "bronze", editorialFont: "serif" },
+  "painted-sign": { id: "painted-sign", label: "Hand-painted sign", font: "brush", treatment: "painted", depth: 0.03, bevel: 0, uppercase: true, wrap: 13, lineHeight: 1.05, inkMaterial: "paint", editorialFont: "sans" },
+  "grass-grown": { id: "grass-grown", label: "Grass-grown letters", font: "heavy", treatment: "grown", depth: 0.7, bevel: 0.04, uppercase: true, wrap: 10, lineHeight: 1.1, inkMaterial: "grass", editorialFont: "sans" },
+  "etched-steel": { id: "etched-steel", label: "Etched steel grotesk", font: "sans", treatment: "engraved", depth: 0.05, bevel: 0, uppercase: true, wrap: 18, lineHeight: 1.3, editorialFont: "mono" },
+  "raised-concrete": { id: "raised-concrete", label: "Raised cast concrete", font: "rounded", treatment: "embossed", depth: 0.32, bevel: 0.03, uppercase: false, wrap: 16, lineHeight: 1.1, editorialFont: "sans" },
   "engraved-serif": { id: "engraved-serif", label: "Engraved serif", font: "serif", treatment: "engraved", depth: 0.12, bevel: 0.012, uppercase: false, wrap: 16, lineHeight: 1.25, editorialFont: "serif" },
   "carved-display": { id: "carved-display", label: "Carved display caps", font: "display", treatment: "engraved", depth: 0.14, bevel: 0.015, uppercase: true, wrap: 13, lineHeight: 1.2, editorialFont: "serif" },
   "engraved-sans": { id: "engraved-sans", label: "Engraved grotesk", font: "sans", treatment: "engraved", depth: 0.12, bevel: 0.01, uppercase: true, wrap: 14, lineHeight: 1.2, editorialFont: "sans" },

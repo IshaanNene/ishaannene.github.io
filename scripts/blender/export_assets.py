@@ -30,9 +30,9 @@ import bpy  # noqa: E402,F401  (must precede mathutils when using the bpy pip mo
 from mathutils import Vector  # noqa: E402
 
 from lib import ROOT, Builder, export_glb, load_world, reset_scene, save_blend, to_three, world_to_blender  # noqa: E402
-from generate_islands import (Terrain, build_foundation, build_pads, build_paths, build_top,  # noqa: E402
+from generate_islands import (Terrain, build_foundation, build_pads, build_paths, build_top, edge_trees, place_cliffs, place_drapes, place_props,  # noqa: E402
                               build_water, scatter_vegetation)
-from generate_buildings import ISLANDS  # noqa: E402
+from generate_buildings import ISLANDS, place_sculpture  # noqa: E402
 from generate_environment import build_bridge, build_vegetation  # noqa: E402
 
 MODELS = os.path.join(ROOT, "public", "models")
@@ -56,6 +56,7 @@ def build_island(cfg, ports, lod):
     terrain = Terrain(cfg["radius"], cfg["seed"], cfg["depth"], spec, ports)
     b = Builder(lod=lod)
     rim, ns = build_top(b, terrain)
+    b.rim = rim
     build_foundation(b, terrain, rim, ns)
     build_pads(b, terrain)
     build_water(b, terrain)
@@ -64,13 +65,18 @@ def build_island(cfg, ports, lod):
     paths = []
     for p in terrain.ports:
         mid = ((p["x"] + hub[0]) / 2 + 0.3 * math.sin(p["angle"] * 3), (p["y"] + hub[1]) / 2 + 0.3 * math.cos(p["angle"] * 2))
-        paths.append({"pts": [(p["x"], p["y"]), mid, hub], "width": 0.95, "mat": spec.get("path_mat", "paving")})
+        road = spec.get("road", False)
+        paths.append({"pts": [(p["x"], p["y"]), mid, hub], "width": 1.15 if road else 0.95, "road": road,
+                      "mat": "asphalt" if road else spec.get("path_mat", "paving")})
     build_paths(b, terrain, paths)
     sx, sy, sf = spec["sign"]
     b.sign = {"pos": to_three((sx, sy, terrain.h(sx, sy))), "facing": [round(math.cos(sf), 4), round(-math.sin(sf), 4)]}
-    b.occupy(sx, sy, 1.6)
+    b.occupy(sx, sy, 2.4)  # wide: signs face outward near the rim, so trees beside them block the view
+    place_sculpture(b, terrain, cfg["id"])
+    place_props(b, terrain, paths, cfg["id"])
     veg = spec.get("veg", {"count": 20, "weights": {"broad_a": 1}})
     scatter_vegetation(b, terrain, veg["count"] if lod == 0 else veg["count"], veg["weights"])
+    edge_trees(b, terrain, veg["weights"])
     return b, terrain
 
 
@@ -100,6 +106,9 @@ def export_islands(world, ids):
                 manifest["islands"][iid] = {
                     "slots": b.slots,
                     "vegetation": b.vegetation,
+                    "props": b.props,
+                    "cliffs": place_cliffs(terrain, b.rim, cfg["seed"]),
+                    "drapes": place_drapes(terrain, b.rim, b.lip, cfg["seed"]),
                     "label": to_three(b.label),
                     "sign": b.sign,
                     "outline": terrain.outline(),
@@ -133,6 +142,13 @@ def export_bridges(world, port_world, manifest):
 
 
 def export_vegetation():
+    # realistic library from Poly Haven scans when the sources are present (npm run assets:vegetation
+    # also compresses its textures); otherwise the stylised procedural fallback below
+    if os.path.isdir(os.path.join(ROOT, "assets-src", "polyhaven", "models")):
+        import build_vegetation
+        build_vegetation.main()
+        print("[vegetation] realistic library exported; run `npm run assets:vegetation` to compress textures", flush=True)
+        return
     reset_scene()
     b = Builder(lod=0)
     build_vegetation(b)

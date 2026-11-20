@@ -3,6 +3,8 @@
  * FloatingIsland — one destination: progressive LOD model, instanced
  * vegetation, physical content, 3D name sign and hover/selection behaviour.
  */
+import { CliffShell } from "./CliffShell";
+import { GroundCover } from "./GroundCover";
 import { Html, useCursor } from "@react-three/drei";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { Component, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -17,10 +19,12 @@ import { surfaceMaterial } from "./content/contentMaterials";
 import { ContentLayer, assignPlacements, useContactPlacements } from "./content/ContentLayer";
 import { MaterialContentObject } from "./content/MaterialContentObject";
 import { ThreeDTypography } from "./content/ThreeDTypography";
+import { FallDrop } from "./Scenery";
+import { chippedBox } from "./content/organic";
 import { AnimatedParts, Building, IslandTerrain, Landmark, RockFoundation, Waterfall } from "./IslandParts";
 import { MaterialSet } from "./materials";
 import { useWorld } from "./store";
-import { Vegetation } from "./Vegetation";
+import { Drapes, Vegetation } from "./Vegetation";
 
 class ModelErrorBoundary extends Component<{ children: ReactNode; label: string }, { failed: boolean }> {
   state = { failed: false };
@@ -35,15 +39,19 @@ class ModelErrorBoundary extends Component<{ children: ReactNode; label: string 
   }
 }
 
-function IslandModel({ url, mats, interactive }: { url: string; mats: MaterialSet; interactive: boolean }) {
+function IslandModel({ url, mats, interactive, islandY }: { url: string; mats: MaterialSet; interactive: boolean; islandY: number }) {
   const n = useIslandNodes(url, mats);
   return (
     <group>
       <IslandTerrain nodes={n.terrain} />
+      <GroundCover terrain={n.terrain} />
       <RockFoundation nodes={n.foundation} />
       <Building nodes={n.buildings} />
       <Landmark nodes={[...n.landmarks, ...n.props, ...n.other]} />
       <Waterfall water={n.water} falls={n.waterfalls} />
+      {n.waterfalls.map((f) => (
+        <FallDrop key={f.uuid} fall={f} islandY={islandY} />
+      ))}
       <AnimatedParts nodes={n.anim} interactive={interactive} />
     </group>
   );
@@ -52,7 +60,7 @@ function IslandModel({ url, mats, interactive }: { url: string; mats: MaterialSe
 const tmp = new THREE.Vector3();
 
 /** Low LOD always; high LOD is fetched lazily when the camera comes close, then swapped by distance. */
-function IslandLOD({ id, mats, forceHigh, interactive }: { id: DestinationId; mats: MaterialSet; forceHigh: boolean; interactive: boolean }) {
+function IslandLOD({ id, mats, forceHigh, interactive, islandY }: { id: DestinationId; mats: MaterialSet; forceHigh: boolean; interactive: boolean; islandY: number }) {
   const d = DESTINATION_MAP[id];
   const [wantHigh, setWantHigh] = useState(forceHigh);
   const [near, setNear] = useState(forceHigh);
@@ -66,13 +74,13 @@ function IslandLOD({ id, mats, forceHigh, interactive }: { id: DestinationId; ma
     if (isNear && !wantHigh) setWantHigh(true);
     if (isNear !== near && (isNear || dist > loadAt * 1.15)) setNear(isNear);
   });
-  const low = <IslandModel url={d.models.low} mats={mats} interactive={interactive} />;
+  const low = <IslandModel islandY={islandY} url={d.models.low} mats={mats} interactive={interactive} />;
   return (
     <ModelErrorBoundary label={id}>
       <Suspense fallback={null}>
         {wantHigh && near ? (
           <Suspense fallback={low}>
-            <IslandModel url={d.models.high} mats={mats} interactive={interactive} />
+            <IslandModel islandY={islandY} url={d.models.high} mats={mats} interactive={interactive} />
           </Suspense>
         ) : (
           low
@@ -85,18 +93,24 @@ function IslandLOD({ id, mats, forceHigh, interactive }: { id: DestinationId; ma
 function IslandSign({ id }: { id: DestinationId }) {
   const m = WORLD_MANIFEST.islands[id];
   const d = DESTINATION_MAP[id];
-  const concrete = useMemo(() => surfaceMaterial(getMaterialPreset("concrete"), "#e6e0d5"), []);
-  const typo = useMemo(() => ({ ...getTypographyPreset("embossed-sans"), depth: 0.35, wrap: 20 }), []);
-  const width = Math.min(4.2, d.title.length * 0.62);
+  const stone = useMemo(() => surfaceMaterial(getMaterialPreset("stone"), "#f2d5a8"), []);
+  // polished gold inlay: metallic so it picks up the sunset sky, faint emission so it still reads in shade
+  const ink = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: "#f1b84b", metalness: 1, roughness: 0.26, envMapIntensity: 1.6, emissive: "#6b4206", emissiveIntensity: 0.55 }),
+    [],
+  );
+  const typo = useMemo(() => ({ ...getTypographyPreset("carved-roman"), font: "heavy" as const, depth: 0.12, bevel: 0.0, wrap: 20 }), []);
+  const width = Math.min(4.8, d.title.length * 0.46 + 1.1);
+  const geo = useMemo(() => chippedBox(width, 1.05, 0.62, Number(d.key) * 11, 0.09), [width, d.key]);
   const rot = Math.atan2(m.sign.facing[0], m.sign.facing[1]);
   return (
     <group position={m.sign.pos} rotation={[0, rot, 0]}>
-      <mesh position={[0, 0.12, -0.12]} material={concrete} castShadow receiveShadow>
-        <boxGeometry args={[width + 0.5, 0.36, 0.55]} />
-      </mesh>
-      <Suspense fallback={null}>
-        <ThreeDTypography text={d.title} preset={typo} material={concrete} width={width} size={0.78} maxLines={1} position={[0, 0.3, -0.2]} />
-      </Suspense>
+      <group rotation-x={-0.07}>
+        <mesh geometry={geo} position={[0, 0.42, -0.1]} material={stone} castShadow receiveShadow />
+        <Suspense fallback={null}>
+          <ThreeDTypography text={d.title} preset={typo} material={ink} width={width - 0.65} size={0.56} maxLines={1} position={[0, 0.2, 0.21]} />
+        </Suspense>
+      </group>
     </group>
   );
 }
@@ -158,10 +172,13 @@ export function FloatingIsland({ id, entries, interactive = true, forceHigh = fa
   return (
     <group ref={group} position={local ? [0, 0, 0] : d.position} {...handlers}>
       <group ref={ground}>
-        <IslandLOD id={id} mats={mats} forceHigh={forceHigh} interactive={interactive} />
+        <IslandLOD id={id} mats={mats} forceHigh={forceHigh} interactive={interactive} islandY={baseY} />
       </group>
       <Suspense fallback={null}>
         <Vegetation instances={manifest.vegetation} />
+        <Vegetation instances={manifest.props ?? []} model="props" />
+        <CliffShell instances={manifest.cliffs ?? []} />
+        <Drapes instances={manifest.drapes ?? []} />
       </Suspense>
       <IslandSign id={id} />
       <ContentLayer placed={placed} ground={ground} interactive={interactive} />

@@ -67,6 +67,10 @@ MATERIALS = {
     "mint":           ("#8BC9A5", 0.7, 0.0, 0),
     "ink":            ("#171717", 0.7, 0.0, 0),
     "cream":          ("#F4EFE6", 0.8, 0.0, 0),
+    "gold":           ("#F1B84B", 0.22, 1.0, 0),
+    "asphalt":        ("#3A3A3D", 0.95, 0.0, 0),
+    "roof_tile":      ("#B8603A", 0.85, 0.0, 0),
+    "corrugated":     ("#AEB3B8", 0.5, 0.6, 0),
     "emit_lime":      ("#DFFF00", 0.4, 0.0, 4),
     "emit_warm":      ("#FFC979", 0.4, 0.0, 3),
     "bark":           ("#5A4230", 0.95, 0.0, 0),
@@ -358,6 +362,7 @@ class Builder:
         self.occupied: list[tuple[float, float, float]] = []
         self.slots: list[dict] = []
         self.vegetation: list[dict] = []
+        self.props: list[dict] = []  # instanced scanned props (public/models/props/props.glb)
         self.label = Vector((0, 0, 4))
         self.sign = None
         self.extras: dict = {}
@@ -387,6 +392,12 @@ class Builder:
 
     def occupy(self, x, y, r):
         self.occupied.append((x, y, r))
+
+    def prop(self, v, x, y, z, facing=0.0, s=1.0, occupy=0.0):
+        """Instance a scanned prop. `facing` is the Blender-space angle the prop's front (-Y) turns to."""
+        self.props.append({"v": v, "p": to_three((x, y, z)), "r": round(facing + math.pi / 2, 3), "s": round(s, 3)})
+        if occupy:
+            self.occupy(x, y, occupy)
 
     def is_free(self, x, y, r):
         for ox, oy, orad in self.occupied:

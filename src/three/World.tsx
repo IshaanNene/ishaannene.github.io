@@ -1,14 +1,15 @@
 "use client";
 /** The homepage archipelago: Canvas root composing every world system. */
 import { AdaptiveDpr, PerformanceMonitor, Preload, useProgress } from "@react-three/drei";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Bloom, EffectComposer, SMAA, Vignette } from "@react-three/postprocessing";
 import { Suspense, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { DESTINATIONS } from "@/config/world";
 import type { ContentSummary } from "@/lib/content/schema";
 import { preloadModel } from "./AssetLoader";
-import { LighthouseBeam, Lighting, SkyAndEnvironment, WorldClock, WorldClouds } from "./Atmosphere";
+import { LighthouseBeam, Lighting, SkyAndEnvironment, WorldClock } from "./Atmosphere";
+import { Airship, CloudBanks, Islets, Ocean } from "./Scenery";
 import { Bridges } from "./Bridge";
 import { FloatingIsland } from "./FloatingIsland";
 import { useWorld } from "./store";
@@ -37,6 +38,16 @@ function ReadySignal() {
   return null;
 }
 
+/** Development only: `window.__world` exposes the renderer, scene and camera for inspection. */
+function DebugHandle() {
+  const { gl, scene, camera } = useThree();
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    (window as unknown as { __world?: unknown }).__world = { gl, scene, camera, THREE };
+  }, [gl, scene, camera]);
+  return null;
+}
+
 export default function World({ entries }: { entries: ContentSummary[] }) {
   const quality = useWorld((s) => s.quality);
   const setQuality = useWorld((s) => s.setQuality);
@@ -57,7 +68,7 @@ export default function World({ entries }: { entries: ContentSummary[] }) {
     <Canvas
       shadows={{ type: THREE.PCFShadowMap }}
       dpr={dpr}
-      camera={{ fov: 38, near: 0.5, far: 600, position: [6, 46, 66] }}
+      camera={{ fov: 38, near: 0.5, far: 2500, position: [6, 46, 66] }}
       gl={{ antialias: !high, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
       onPointerMissed={() => useWorld.getState().setHovered(null)}
       className="world-canvas"
@@ -79,13 +90,17 @@ export default function World({ entries }: { entries: ContentSummary[] }) {
         ))}
         <Bridges />
         <LighthouseBeam />
-        <WorldClouds count={high ? 2 : 1} />
+        <Ocean reflective={high} />
+        <CloudBanks detail={high ? 2 : 1} />
+        <Islets />
+        <Airship />
         <Preload />
       </Suspense>
       <WorldCamera />
       <DestinationController />
       <WorldNavigation />
       <ReadySignal />
+      <DebugHandle />
       {high && (
         <EffectComposer multisampling={0} enableNormalPass={false}>
           <SMAA />
