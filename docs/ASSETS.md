@@ -104,3 +104,47 @@ rendered instead (error boundary).
 - Vegetation, rocks and trees are GPU-instanced; raycasts use `three-mesh-bvh`.
 - Shadows re-render on a cadence, not every frame; post-processing is high-quality only.
 - `PerformanceMonitor` drops DPR and effects on slow devices; coarse pointers start in low quality.
+
+## Third-party assets (all free to reuse)
+
+| Asset | Source | Licence | Used for |
+|---|---|---|---|
+| `public/textures/pbr/rock` | Poly Haven — rock_face_03 | CC0 | island cliffs (foundation nodes) |
+| `public/textures/pbr/grass` | Poly Haven — leafy_grass | CC0 | island tops, grass content objects |
+| `public/textures/pbr/planks` | Poly Haven — weathered_planks | CC0 | timber (bridges, signposts) |
+| `public/textures/pbr/concrete` | Poly Haven — concrete_wall_008 | CC0 | concrete buildings and blocks |
+| `public/textures/pbr/stone` | Poly Haven — sandstone_cracks (desaturated) | CC0 | carved tablets, island name stones |
+| `assets-src/fonts/*.ttf` → `public/fonts/*.json` | Google Fonts — Cinzel, Bangers, Archivo Black, Fredoka | OFL | 3D lettering (`node scripts/convert-fonts.mjs`) |
+| Sky, Water, MeshSurfaceSampler | three.js examples (bundled) | MIT | sunset sky, ocean, grass fur |
+
+PBR sets are 1k WebP (colour, normal, roughness). Materials opt in with
+`pbr: "<key>"` (runtime: `ENV_MATERIALS` in `src/three/materials.ts`; content:
+`surface.pbr` in `src/presets/materials.ts`). Island undersides automatically use
+the rock set via the `cliff_*` material variants.
+
+### Poly Haven models (CC0)
+
+Fetched by `scripts/fetch-polyhaven.py` into `assets-src/polyhaven/` (git-ignored, ~175 MB raw);
+only the processed libraries ship:
+
+| Library | Build | Size | Contents |
+| --- | --- | --- | --- |
+| `public/models/vegetation/vegetation.glb` | `npm run assets:vegetation` | 1.4 MB | trees, conifers, bushes, rocks |
+| `public/models/cliffs/cliffs.glb` | `npm run assets:cliffs` | 2.9 MB | 10 rock-face pieces (1.0–1.3k tris) wrapping island undersides |
+| `public/models/props/props.glb` | `npm run assets:props` | 2.1 MB | 13 street / harbour props |
+
+Building textures: `node scripts/convert-textures.mjs` turns the fetched texture sets into
+`public/textures/pbr/<key>/{color,normal,roughness}.webp` (plaster, marble, rock_wall, stone,
+metal, roof_tiles, corrugated; plaster / corrugated / rock_wall / stone colour maps become
+neutral grey detail so the palette colour in `src/three/materials.ts` stays the final albedo).
+
+Cliff and prop placements are generated with the islands (`place_cliffs`, `place_props` in
+`scripts/blender/generate_islands.py`) and stored in the manifest (`cliffs`, `props`); after
+changing them run `npm run assets:blender && npm run assets:optimize`.
+Models: island_tree_02, fir_sapling, shrub_02, shrub_04, fern_02, grass_medium_02, rock_moss_set_01,
+rock_07, rock_09, namaqualand_boulder_02; cliffs: namaqualand_cliff_01/02, rock_face_01/02,
+mountainside, coastal_cliff_01; props: street_lamp_01, painted_wooden_bench, modular_street_seating,
+wooden_picnic_table, outdoor_table_chair_set_01, stone_fire_pit, planter_box_01, wooden_lantern_01,
+utility_box_01, flood_lights, modular_industrial_pipes_01, modular_wooden_pier (potted_plant_02 and
+Lantern_01 are fetched but unused). Textures: white_plaster_rough_01, concrete_wall_008,
+clay_roof_tiles, corrugated_iron_02, metal_plate, marble_01, cliff_side, forest_ground_04.

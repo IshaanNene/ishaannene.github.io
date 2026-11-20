@@ -3,7 +3,7 @@
 import * as THREE from "three";
 import { getMaterialPreset, type MaterialPreset } from "@/presets/materials";
 import type { TypographyPreset } from "@/presets/typography";
-import { getTexture } from "../materials";
+import { getPbrTexture, getTexture } from "../materials";
 
 const cache = new Map<string, THREE.Material>();
 
@@ -23,7 +23,14 @@ export function surfaceMaterial(preset: MaterialPreset, tint?: string): THREE.Me
     thickness: s.transmission ? 0.4 : 0,
     envMapIntensity: s.metalness > 0.5 ? 1.4 : 1,
   });
-  if (s.texture) {
+  if (s.brightness) m.color.multiplyScalar(s.brightness);
+  if (s.pbr) {
+    const r = s.textureRepeat ?? 1;
+    m.map = getPbrTexture(s.pbr, "color", r);
+    m.normalMap = getPbrTexture(s.pbr, "normal", r);
+    m.roughnessMap = getPbrTexture(s.pbr, "roughness", r);
+    m.normalScale.setScalar(s.normalScale ?? 1);
+  } else if (s.texture) {
     const n = getTexture(s.texture, "normal");
     const r = getTexture(s.texture, "roughness");
     if (n) {
@@ -76,6 +83,10 @@ export function inkMaterial(surface: MaterialPreset, typo: TypographyPreset, tin
       break;
     }
     default: {
+      if ((typo.treatment === "engraved" || typo.treatment === "painted") && typo.inkMaterial) {
+        m = surfaceMaterial(getMaterialPreset(typo.inkMaterial));
+        break;
+      }
       const i = surface.ink;
       m = new THREE.MeshStandardMaterial({
         color: i.color,

@@ -4,9 +4,6 @@ date: 2025-12-01
 excerpt: The classic table, updated for NVMe, 400G networking and the cloud region next door.
 tags: [performance, hardware]
 visual:
-  material: stone
-  typography: engraved-serif
-  objectType: slab
   scale: 0.9
 ---
 

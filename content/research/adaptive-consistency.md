@@ -5,10 +5,6 @@ excerpt: Switching consistency levels per key based on observed contention reduc
 tags: [databases, consistency, paper]
 featured: true
 subtitle: Preprint · 2026
-visual:
-  material: glass
-  typography: etched-mono
-  objectType: glass-panel
 ---
 
 ## Abstract

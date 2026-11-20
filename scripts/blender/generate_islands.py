@@ -248,6 +248,11 @@ def build_foundation(b: Builder, terrain: Terrain, rim, NS):
         rings.append((ring(f_end * fac + 0.02, z, 0.1, 0.15, 0, 20 + i), "stone_dark"))
     tip = (tip_off.x, tip_off.y, -D - 0.6)
 
+    # outermost surface just below the grass lip, per rim sample: greenery hangs from here
+    # (place_drapes), so it always touches rock instead of floating where the lip is pulled in
+    b.lip = [max(math.hypot(rings[0][0][j][0], rings[0][0][j][1]), math.hypot(rings[1][0][j][0], rings[1][0][j][1]))
+             for j in range(NS)]
+
     # connect rim -> rings
     all_rings = [(rim, "soil")] + rings
     for i in range(len(all_rings) - 1):
@@ -352,6 +357,49 @@ def build_paths(b: Builder, terrain: Terrain, paths):
             faces.append((2 * n + i, 2 * n + i + 1, i + 1, i))  # left skirt
             faces.append((n + i, n + i + 1, 3 * n + i + 1, 3 * n + i))  # right skirt
         b.add(bm_from(verts, faces), mat, obj="terrain", smooth=False)
+        if path.get("road"):
+            build_road_details(b, terrain, samples, width)
+
+
+def _ribbon(b, terrain, samples, o0, o1, top, mat, obj="terrain"):
+    """A strip beside a centreline, from offset o0 to o1, `top` above the ground, with skirts."""
+    n = len(samples)
+    a_, c_ = [], []
+    for i, p in enumerate(samples):
+        t = samples[min(n - 1, i + 1)] - samples[max(0, i - 1)]
+        t.z = 0
+        t.normalize()
+        nrm = Vector((-t.y, t.x, 0))
+        for off, arr in ((o0, a_), (o1, c_)):
+            q = p + nrm * off
+            arr.append((q.x, q.y, terrain.h(q.x, q.y) + top))
+    verts = a_ + c_ + [(x, y, z - 0.2) for x, y, z in a_] + [(x, y, z - 0.2) for x, y, z in c_]
+    faces = []
+    for i in range(n - 1):
+        faces.append((i, i + 1, n + i + 1, n + i))
+        faces.append((2 * n + i, 2 * n + i + 1, i + 1, i))
+        faces.append((n + i, n + i + 1, 3 * n + i + 1, 3 * n + i))
+    b.add(bm_from(verts, faces), mat, obj=obj, smooth=False)
+
+
+def build_road_details(b, terrain, samples, width):
+    """Granite kerbs on both edges and a dashed centre line (the surface itself is asphalt)."""
+    for sgn in (1, -1):
+        o0, o1 = sgn * width / 2, sgn * (width / 2 + 0.12)
+        _ribbon(b, terrain, samples, min(o0, o1), max(o0, o1), 0.1, "concrete_light")
+    total = sum((samples[i + 1] - samples[i]).length for i in range(len(samples) - 1))
+    d, i, acc = 0.5, 0, 0.0
+    while d < total - 0.5:
+        while i < len(samples) - 2 and acc + (samples[i + 1] - samples[i]).length < d:
+            acc += (samples[i + 1] - samples[i]).length
+            i += 1
+        t = (samples[i + 1] - samples[i])
+        t.z = 0
+        t.normalize()
+        p = samples[i] + t * (d - acc)
+        b.add(bm_box(0.32, 0.05, 0.012, 0.0), "cream", T(p.x, p.y, terrain.h(p.x, p.y) + 0.052, rz=math.atan2(t.y, t.x)),
+              obj="props", detail=1)
+        d += 0.62
 
 
 def build_water(b: Builder, terrain: Terrain):
@@ -437,3 +485,252 @@ def scatter_vegetation(b: Builder, terrain: Terrain, count, weights, min_spacing
         b.vegetation.append({"v": variant, "p": to_three((x, y, z - 0.05)), "r": round(rng.uniform(0, TAU), 3),
                              "s": round(s, 3)})
     return placed
+
+
+# --------------------------------------------------------------------------------------
+# Scanned cliff wrap (placements only; pieces live in public/models/cliffs/cliffs.glb)
+# --------------------------------------------------------------------------------------
+
+# variant -> (height, depth) at width 1, in the piece's own frame (see build_cliffs.py)
+CLIFF_KIT = {
+    "cliff_namaqualand_cliff_01": (0.60, 0.52, 3),
+    "cliff_namaqualand_cliff_02_0": (0.59, 0.64, 2),
+    "cliff_namaqualand_cliff_02_1": (0.70, 0.62, 2),
+    "cliff_rock_face_01": (0.72, 0.78, 3),
+    "cliff_rock_face_02": (0.92, 0.78, 2),
+    "cliff_mountainside": (1.04, 0.52, 2),
+    "cliff_coastal_cliff_01_0": (0.42, 0.34, 2),
+    "cliff_coastal_cliff_01_1": (0.42, 0.40, 2),
+    "cliff_coastal_cliff_01_2": (0.44, 0.36, 2),
+    "cliff_coastal_cliff_01_3": (0.44, 0.28, 2),
+}
+
+
+def place_cliffs(terrain, rim, seed):
+    """Overlapping bands of scanned rock faces wrapped around the underside, front facing outward,
+    tops tucked under the grass lip, each band following the taper of the foundation.
+    Returns [{"v": variant, "m": three.js Matrix4 (column-major)}]."""
+    from mathutils import Matrix
+
+    rng = random.Random(seed * 13 + 5)
+    D = terrain.depth
+    names = list(CLIFF_KIT)
+    weights = [CLIFF_KIT[n][2] for n in names]
+    C = Matrix(((1, 0, 0, 0), (0, 0, 1, 0), (0, -1, 0, 0), (0, 0, 0, 1)))  # blender -> three
+    Ci = C.inverted()
+
+    # rim polyline with cumulative arc length
+    pts = [Vector(p) for p in rim]
+    n = len(pts)
+    seg = [(pts[(i + 1) % n] - pts[i]).xy.length for i in range(n)]
+    perim = sum(seg)
+
+    def at(s):
+        s %= perim
+        i = 0
+        while s > seg[i]:
+            s -= seg[i]
+            i += 1
+        t = s / seg[i]
+        return pts[i].lerp(pts[(i + 1) % n], t)
+
+    def prof(z):  # foundation radius factor at absolute depth z
+        return max(0.12, (1 - min(0.97, max(0.0, -z / D))) ** 0.62)
+
+    out = []
+    top = None
+    for k, (hf, wmul) in enumerate([(0.36, 1.35), (0.3, 1.3), (0.26, 1.2), (0.22, 1.1), (0.18, 1.0)]):
+        H = D * hf
+        z_top = -0.1 if top is None else top
+        z_bot = z_top - H
+        if prof(z_bot) < 0.22:
+            break
+        W = H * wmul
+        spacing = W * 0.6 * prof((z_top + z_bot) / 2)
+        count = max(5, int(perim * prof((z_top + z_bot) / 2) / spacing))
+        off = rng.uniform(0, perim)
+        for i in range(count):
+            p = at(off + perim * i / count)
+            rim_z = p.z
+            radial = Vector((p.x, p.y, 0))
+            r_rim = radial.length
+            u = radial.normalized()
+            ang_j = rng.uniform(-0.22, 0.22)
+            u = Matrix.Rotation(ang_j, 3, "Z") @ u
+            t = Vector((-u.y, u.x, 0))
+            h = H * rng.uniform(0.85, 1.25)
+            w = W * rng.uniform(0.8, 1.2)
+            zt = (rim_z - 0.12 if k == 0 else z_top) + rng.uniform(-0.15, 0.1) * H * (0 if k == 0 else 1)
+            zb = zt - h
+            # front surface radius at the top and bottom of this piece
+            rt = r_rim * prof(zt - (0 if k == 0 else 0)) * (0.975 if k == 0 else 1.02)
+            rb = r_rim * prof(zb) * 1.02
+            slope = math.atan2(rt - rb, h)  # lean so the face follows the taper (looks down-and-out)
+            v = rng.choices(names, weights)[0]
+            vh, vd, _ = CLIFF_KIT[v]
+            depth = w * vd * 0.9
+            R = Matrix((t, -u, Vector((0, 0, 1)))).transposed()  # columns: X=tangent, Y=-outward, Z=up
+            R = Matrix.Rotation(slope + rng.uniform(-0.06, 0.06), 3, t) @ R  # top leans out, face looks down
+            R = Matrix.Rotation(rng.uniform(-0.12, 0.12), 3, u) @ R
+            zc = (zt + zb) / 2
+            rc = (rt + rb) / 2 - depth * 0.38
+            pos = Vector((u.x * rc, u.y * rc, zc))
+            M = Matrix.Translation(pos) @ R.to_4x4() @ Matrix.Diagonal((w, depth / vd, h / vh, 1))
+            M3 = C @ M @ Ci
+            out.append({"v": v, "m": [round(M3[r][c], 4) for c in range(4) for r in range(4)]})
+        top = z_bot + H * 0.28
+    return out
+
+
+# --------------------------------------------------------------------------------------
+# Scanned props (placements only; models live in public/models/props/props.glb)
+# --------------------------------------------------------------------------------------
+
+# per island: (prop, count, footprint radius, ring (min, max) as a fraction of the island radius)
+PROP_SETS = {
+    "about": [("seating", 3, 0.6, (0.3, 0.7)), ("planter", 5, 0.35, (0.25, 0.75)), ("lantern", 5, 0.15, (0.3, 0.8)),
+              ("firepit", 1, 0.6, (0.4, 0.7))],
+    "projects": [("flood", 4, 0.4, (0.35, 0.8)), ("pipes", 3, 0.45, (0.3, 0.75)), ("utility", 4, 0.25, (0.3, 0.8)),
+                 ("picnic", 1, 0.9, (0.35, 0.7))],
+    "blogs": [("cafe", 4, 0.5, (0.25, 0.7)), ("bench", 3, 0.4, (0.3, 0.75)), ("lantern", 5, 0.15, (0.3, 0.8)),
+              ("planter", 3, 0.35, (0.25, 0.7))],
+    "research": [("seating", 2, 0.6, (0.3, 0.7)), ("utility", 3, 0.25, (0.3, 0.8)), ("flood", 2, 0.4, (0.4, 0.8)),
+                 ("planter", 4, 0.35, (0.25, 0.75))],
+    "playground": [("picnic", 3, 0.9, (0.3, 0.72)), ("firepit", 1, 0.6, (0.3, 0.7)), ("lantern", 6, 0.15, (0.3, 0.8)),
+                   ("bench", 2, 0.4, (0.3, 0.75))],
+    "resume": [("seating", 3, 0.6, (0.3, 0.7)), ("planter", 4, 0.35, (0.25, 0.75)), ("lantern", 4, 0.15, (0.3, 0.8)),
+               ("cafe", 2, 0.5, (0.3, 0.7))],
+    "contact": [("lantern", 6, 0.15, (0.3, 0.82)), ("bench", 2, 0.4, (0.3, 0.75)), ("picnic", 1, 0.9, (0.3, 0.65)),
+                ("firepit", 1, 0.6, (0.35, 0.7))],
+}
+
+
+def place_props(b: Builder, terrain: Terrain, paths, iid):
+    """Street lamps and benches along the paths, then each island's own themed set on free ground."""
+    rng = random.Random(terrain.seed * 17 + 5)
+    # along paths: lamps every ~2.4 units alternating sides, a bench facing the path halfway along
+    for path in paths:
+        pts = [Vector((x, y, 0)) for x, y in path["pts"]]
+        off = path.get("width", 0.9) / 2 + 0.36
+        dist, k = 1.2, 0
+        total = sum((pts[i + 1] - pts[i]).length for i in range(len(pts) - 1))
+        while dist < total - 1.4:
+            # point + tangent at arc length `dist`
+            acc = 0.0
+            for i in range(len(pts) - 1):
+                seg = (pts[i + 1] - pts[i]).length
+                if acc + seg >= dist:
+                    t = (pts[i + 1] - pts[i]).normalized()
+                    p = pts[i] + t * (dist - acc)
+                    break
+                acc += seg
+            nrm = Vector((-t.y, t.x, 0)) * (1 if k % 2 == 0 else -1)
+            q = p + nrm * off
+            if b.is_free(q.x, q.y, 0.18) and not terrain.in_water(q.x, q.y, 0.3) and terrain.rr(q.x, q.y) < 0.86:
+                face = math.atan2(-nrm.y, -nrm.x)
+                b.prop("lamp", q.x, q.y, terrain.h(q.x, q.y) - 0.02, face, s=0.8, occupy=0.25)
+            if k == 1:
+                qb = p - nrm * (off + 0.12)
+                if b.is_free(qb.x, qb.y, 0.3) and not terrain.in_water(qb.x, qb.y, 0.3) and terrain.rr(qb.x, qb.y) < 0.84:
+                    b.prop(rng.choice(["bench", "seating"]), qb.x, qb.y, terrain.h(qb.x, qb.y) - 0.02,
+                           math.atan2(nrm.y, nrm.x), occupy=0.5)
+            dist += 2.4
+            k += 1
+    # themed set, scattered on free ground, facing roughly toward the hub
+    hub = terrain.spec.get("hub", (0, 0))
+    for v, n, rad, (r0, r1) in PROP_SETS.get(iid, []):
+        placed, tries = 0, 0
+        while placed < n and tries < n * 120:
+            tries += 1
+            ang = rng.uniform(0, TAU)
+            rr = rng.uniform(r0, r1)
+            r = terrain.r(ang) * rr
+            x, y = math.cos(ang) * r, math.sin(ang) * r
+            if not b.is_free(x, y, rad) or terrain.in_water(x, y, rad + 0.2):
+                continue
+            # keep to gentle ground
+            z = terrain.h(x, y)
+            slope = max(abs(terrain.h(x + rad, y) - z), abs(terrain.h(x, y + rad) - z),
+                        abs(terrain.h(x - rad, y) - z), abs(terrain.h(x, y - rad) - z))
+            if slope > 0.12 + rad * 0.12:
+                continue
+            face = math.atan2(hub[1] - y, hub[0] - x) + rng.uniform(-0.5, 0.5)
+            s = rng.uniform(0.92, 1.08)
+            b.prop(v, x, y, z - 0.02, face, s=s, occupy=rad)
+            placed += 1
+
+
+def edge_trees(b: Builder, terrain: Terrain, weights, seed=0):
+    """Dense tree line around the rim (two staggered rows), like the overgrown edges of the
+    reference islands. The front sector (where the signs and cameras look from, Blender -Y) only
+    gets bushes and low cypresses so it never hides the island's buildings or its name."""
+    rng = random.Random(terrain.seed * 53 + seed)
+    trees = {k: w for k, w in weights.items() if k not in ("rock", "bush")} or {"broad_a": 1}
+    sand = terrain.spec.get("sand", False)
+    placed = 0
+    for row, rr in enumerate((0.86, 0.77)):
+        L = TAU * terrain.R * rr
+        n = int(L / (0.78 if row == 0 else 1.0))
+        for k in range(n):
+            ang = (k + 0.5 * row + rng.uniform(-0.3, 0.3)) / n * TAU
+            r = terrain.r(ang) * (rr + rng.uniform(-0.03, 0.03)) * (0.93 if sand else 1.0)
+            x, y = math.cos(ang) * r, math.sin(ang) * r
+            # keep bridge landings open
+            if any(abs((ang - p["angle"] + math.pi) % TAU - math.pi) < 1.7 / max(r, 1) for p in terrain.ports):
+                continue
+            front = abs((ang + math.pi / 2 + math.pi) % TAU - math.pi) < 0.85
+            if front or rng.random() < 0.3:
+                v = "bush" if (front and rng.random() < 0.8) or not front else "cypress"
+                if v == "cypress" and "cypress" not in weights:
+                    v = "bush"
+            else:
+                v = rng.choices(list(trees), list(trees.values()))[0]
+            rad = {"bush": 0.4, "cypress": 0.5}.get(v, 0.65)
+            if not b.is_free(x, y, rad) or terrain.in_water(x, y, 0.7):
+                continue
+            s = rng.uniform(0.75, 1.05) * (0.7 if front else 1.0)
+            b.vegetation.append({"v": v, "p": to_three((x, y, terrain.h(x, y) - 0.05)), "r": round(rng.uniform(0, TAU), 3),
+                                 "s": round(s, 3)})
+            b.occupy(x, y, rad * 0.8)
+            placed += 1
+    return placed
+
+
+def place_drapes(terrain, rim, lip, seed):
+    """Greenery spilling over the rim: the leaf-mound bush turned upside down and stretched into
+    drooping curtains, hung from the outermost rock just below the grass lip (`lip`: radius per
+    rim sample, from build_foundation) so it covers the soil band and the cliff tops and always
+    touches rock. Bridge landings and waterfall lips stay clear. Returns [{"v", "m"}] like cliffs."""
+    from mathutils import Matrix
+
+    rng = random.Random(seed * 29 + 3)
+    C = Matrix(((1, 0, 0, 0), (0, 0, 1, 0), (0, -1, 0, 0), (0, 0, 0, 1)))
+    Ci = C.inverted()
+    n = len(rim)
+    blocked = [p["angle"] for p in terrain.ports] + [ch["angle"] for ch in terrain.channels]
+    perim = sum(math.hypot(rim[(j + 1) % n][0] - rim[j][0], rim[(j + 1) % n][1] - rim[j][1]) for j in range(n))
+    out = []
+    s = rng.uniform(0, 0.4)
+    while s < perim:
+        f = s / perim * n  # rim samples are evenly spaced in angle
+        j, k = int(f) % n, (int(f) + 1) % n
+        a = f - int(f)
+        s += rng.uniform(0.26, 0.48)
+        ang = TAU * f / n
+        if any(abs((ang - b + math.pi) % TAU - math.pi) < 1.3 / max(terrain.R, 1) for b in blocked):
+            continue
+        if rng.random() < 0.08:  # the odd gap so it reads as growth, not a hem
+            continue
+        u = Vector((math.cos(ang), math.sin(ang), 0))
+        t = Vector((-u.y, u.x, 0))
+        r = lerp(lip[j], lip[k], a) * rng.uniform(0.985, 1.01)
+        z = lerp(rim[j][2], rim[k][2], a)
+        pos = Vector((u.x * r, u.y * r, z - rng.uniform(0.02, 0.1)))
+        w = rng.uniform(0.45, 0.78)
+        drop = rng.uniform(0.9, 2.4) if rng.random() < 0.55 else rng.uniform(0.5, 0.9)
+        R = Matrix.Rotation(math.pi, 4, t)  # upside down: the mound hangs below the lip
+        R = Matrix.Rotation(rng.uniform(-0.15, 0.25), 4, t) @ R  # lean with the cliff face
+        M = Matrix.Translation(pos) @ R @ Matrix.Rotation(rng.uniform(0, TAU), 4, "Z") @ Matrix.Diagonal((w, w * 0.8, w * drop, 1))
+        M3 = C @ M @ Ci
+        out.append({"v": "bush", "m": [round(M3[r_][c], 4) for c in range(4) for r_ in range(4)]})
+    return out

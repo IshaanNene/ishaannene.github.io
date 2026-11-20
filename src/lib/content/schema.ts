@@ -5,11 +5,11 @@ export type Category = (typeof CATEGORIES)[number];
 
 /** Default physical treatment per category (overridable per entry via `visual`). */
 export const CATEGORY_DEFAULTS: Record<Category, { material: string; typography: string; objectType: string }> = {
-  blogs: { material: "stone", typography: "engraved-serif", objectType: "slab" },
-  projects: { material: "metal", typography: "embossed-sans", objectType: "plaque" },
-  research: { material: "glass", typography: "etched-mono", objectType: "glass-panel" },
-  playground: { material: "grass", typography: "grown-display", objectType: "hedge" },
-  resume: { material: "concrete", typography: "embossed-sans", objectType: "wall" },
+  blogs: { material: "stone", typography: "carved-roman", objectType: "tablet" },
+  projects: { material: "wood", typography: "painted-sign", objectType: "signpost" },
+  research: { material: "steel", typography: "etched-steel", objectType: "metal-panel" },
+  playground: { material: "grass", typography: "grass-grown", objectType: "grass-letters" },
+  resume: { material: "concrete", typography: "raised-concrete", objectType: "concrete-block" },
 };
 
 const Placement = z.union([

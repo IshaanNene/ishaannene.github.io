@@ -17,9 +17,20 @@ export interface VegInstance {
   s: number;
 }
 
+/** A scanned cliff piece wrapped around an island's underside; `m` is a column-major Matrix4. */
+export interface CliffInstance {
+  v: string;
+  m: number[];
+}
+
 export interface IslandManifest {
   slots: SlotDef[];
   vegetation: VegInstance[];
+  cliffs?: CliffInstance[];
+  /** greenery hanging over the rim (vegetation library variant + full matrix) */
+  drapes?: CliffInstance[];
+  /** scanned street furniture / harbour props, same transform format as vegetation */
+  props?: VegInstance[];
   label: Vec3;
   sign: { pos: Vec3; facing: [number, number] };
   outline: [number, number][];
@@ -143,6 +154,8 @@ export const DESTINATIONS: Destination[] = worldJson.islands.map((i) => ({
 export const DESTINATION_MAP = Object.fromEntries(DESTINATIONS.map((d) => [d.id, d])) as Record<DestinationId, Destination>;
 
 export const VEGETATION_MODEL = "/models/vegetation/vegetation.glb";
+export const CLIFF_MODEL = "/models/cliffs/cliffs.glb";
+export const PROP_MODEL = "/models/props/props.glb";
 
 export const OVERVIEW = {
   position: [4, 34, 72] as Vec3,

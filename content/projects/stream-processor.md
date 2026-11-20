@@ -8,10 +8,6 @@ featured: true
 subtitle: Exactly-once streaming in Rust
 links:
   - { label: Source, href: "https://github.com/IshaanNene" }
-visual:
-  material: metal
-  typography: embossed-sans
-  objectType: plaque
 ---
 
 Tidewater ingests events from Kafka-compatible logs, maintains incremental state in an embedded LSM tree and commits outputs transactionally.

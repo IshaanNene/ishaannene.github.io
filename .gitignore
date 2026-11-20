@@ -8,3 +8,9 @@ next-env.d.ts
 *.tsbuildinfo
 .claude/settings.local.json
 __pycache__/
+assets-src/polyhaven/
+# generated from the Poly Haven sources above by scripts/blender/build_{vegetation,cliffs,props}.py;
+# they embed the scan data (tens of MB) and add nothing the scripts don't, so only the GLBs ship
+assets-src/blender/vegetation/
+assets-src/blender/cliffs/
+assets-src/blender/props/

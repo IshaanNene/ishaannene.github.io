@@ -31,10 +31,9 @@ def bench(b, x, y, z, rz=0.0, mat="wood"):
         b.add(bm_box(0.08, 0.34, 0.36, 0.01), "concrete_dark", M @ T(sx, 0, 0), obj="props", detail=1)
 
 
-def lamp(b, x, y, z, h=1.5):
-    b.cyl("metal_dark", 0.035, 0.03, h, (x, y, z), segs=6, obj="props", detail=1)
-    b.add(bm_box(0.16, 0.16, 0.12, 0.02), "emit_warm", T(x, y, z + h), obj="props", detail=1)
-    b.add(bm_box(0.22, 0.22, 0.03, 0.0), "metal_dark", T(x, y, z + h + 0.12), obj="props", detail=1)
+def lamp(b, x, y, z, h=1.5, facing=None):
+    # scanned cast-iron street lamp (2.4 units tall at s=1)
+    b.prop("lamp", x, y, z - 0.02, math.atan2(-y, -x) if facing is None else facing, s=max(0.6, h / 1.9))
 
 
 def column(b, x, y, z, h, r=0.16, mat="stone_light"):
@@ -97,7 +96,7 @@ def pergola(b, x, y, z, w, d, h=2.0, rz=0.0):
 # --------------------------------------------------------------------------------------
 
 SPEC_ABOUT = {
-    "noise": 0.4, "dome": 0.9, "port_h": 0.45, "hub": (0, -0.5), "path_mat": "paving",
+    "noise": 0.4, "dome": 0.9, "port_h": 0.45, "hub": (0, -0.5), "path_mat": "paving", "road": True,
     "pads": [
         {"shape": "rect", "x": 0, "y": 0.6, "w": 8.0, "d": 7.0, "h": 0.7, "paved": "paving", "blend": 2.0},
         {"x": -5.0, "y": -3.3, "r": 2.1, "h": 1.25, "blend": 1.6},
@@ -162,15 +161,15 @@ def build_about(b: Builder, t):
         lamp(b, x, -3.0, z0)
         lamp(b, x, 2.8, z0)
 
-    # monument: tilted orange ring that slowly rotates, pierced by a lime rod
+    # monument: a faceted golden gem turning slowly above a stepped stone plinth
     mx, my, mz = 5.3, -2.7, 0.9
-    b.box("stone_dark", (1.7, 1.7, 0.5), (mx, my, mz), bevel=0.05, occupy=True)
-    b.box("stone_mid", (1.1, 1.1, 0.25), (mx, my, mz + 0.5), bevel=0.03)
-    ring = b.separate("anim_spin_monument", (mx, my, mz + 2.3))
-    b.add(bm_torus(1.15, 0.15, 48, 12), "orange", T(mx, my, mz + 2.3, rx=math.pi / 2, ry=0.35), obj=ring, smooth=True)
-    b.add(bm_box(0.5, 0.5, 0.5, 0.04), "lime", T(mx, my, mz + 2.05, rx=0.6, ry=0.6), obj=ring)
-    b.rod("ink", (mx - 0.1, my, mz + 0.75), (mx + 0.25, my + 0.2, mz + 3.8), 0.05, 8)
-    b.box("concrete_dark", (0.45, 0.45, 2.8), (mx + 1.0, my + 0.6, mz), bevel=0.02, rz=0.3)
+    b.box("stone_dark", (1.9, 1.9, 0.35), (mx, my, mz), bevel=0.04, occupy=True)
+    b.box("stone_light", (1.45, 1.45, 0.3), (mx, my, mz + 0.35), bevel=0.04)
+    b.box("stone_mid", (0.95, 0.95, 0.55), (mx, my, mz + 0.65), bevel=0.04)
+    b.box("gold", (1.0, 1.0, 0.06), (mx, my, mz + 1.2), bevel=0.01)
+    gem = b.separate("anim_spin_monument", (mx, my, mz + 2.4))
+    cut = [(0.0, -0.95), (0.62, 0.0), (0.5, 0.32), (0.26, 0.5), (0.0, 0.5)]
+    b.add(bm_lathe(cut, 8), "gold", T(mx, my, mz + 2.4, s=(1.0, 1.0, 1.25)), obj=gem, smooth=False)
 
     # terraced garden with retaining wall
     gx, gy, gh = -5.0, -3.3, 1.25
@@ -191,7 +190,7 @@ def build_about(b: Builder, t):
 # --------------------------------------------------------------------------------------
 
 SPEC_PROJECTS = {
-    "noise": 0.3, "dome": 0.5, "port_h": 0.4, "hub": (0.6, -1.1), "path_mat": "concrete",
+    "noise": 0.3, "dome": 0.5, "port_h": 0.4, "hub": (0.6, -1.1), "path_mat": "concrete", "road": True,
     "pads": [
         {"shape": "rect", "x": 0.8, "y": 0.8, "w": 7.0, "d": 5.2, "h": 0.45, "paved": "concrete", "blend": 1.6},
         {"x": -3.2, "y": 2.5, "r": 1.9, "h": 0.6, "paved": "concrete_dark", "blend": 1.3},
@@ -207,7 +206,7 @@ SPEC_PROJECTS = {
 def server_hall(b, x, y, z, w, d, h, rz=0.0):
     M = T(x, y, z, rz=rz)
     b.add(bm_box(w, d, 0.2, 0.02), "concrete_dark", M, obj="buildings")
-    b.add(bm_box(w - 0.1, d - 0.1, h, 0.03), "metal", M @ T(0, 0, 0.2), obj="buildings")
+    b.add(bm_box(w - 0.1, d - 0.1, h, 0.03), "corrugated", M @ T(0, 0, 0.2), obj="buildings")
     # cladding ribs
     n = int(w / 0.28)
     for k in range(n + 1):
@@ -456,7 +455,7 @@ def build_blogs(b: Builder, t):
 # --------------------------------------------------------------------------------------
 
 SPEC_RESEARCH = {
-    "noise": 0.35, "dome": 0.6, "port_h": 0.45, "hub": (1.3, -1.9), "path_mat": "concrete_light",
+    "noise": 0.35, "dome": 0.6, "port_h": 0.45, "hub": (1.3, -1.9), "path_mat": "concrete_light", "road": True,
     "hills": [{"x": -2.6, "y": 2.6, "r": 3.2, "h": 1.0}],
     "pads": [
         {"x": -2.6, "y": 2.6, "r": 1.9, "h": 1.7, "paved": "concrete_light", "blend": 1.5},
@@ -652,7 +651,7 @@ def build_playground(b: Builder, t):
     rng = random.Random(4)
     for i in range(3):
         for j in range(3):
-            px, py = -2.5 + i * 0.7, -3.3 + j * 0.7
+            px, py = -4.7 + i * 0.7, -0.9 + j * 0.7
             pz = t.h(px, py)
             name = b.separate(f"anim_bounce_{k}", (px, py, pz))
             h = rng.uniform(0.6, 1.15)
@@ -669,8 +668,8 @@ def build_playground(b: Builder, t):
     for (x, y) in [(-1.8, 1.2), (1.8, 1.4)]:
         bench(b, x, y, 0.4, rz=math.atan2(y - 0.3, x - 0.3) + math.pi / 2)
     # experiment slots (grass-grown / sculptural typography)
-    for a in (205, 245, 285, 325):
-        x, y = 0.3 + math.cos(a * D2R) * 2.35, 0.3 + math.sin(a * D2R) * 2.35
+    for a in (212, 259, 306):
+        x, y = 0.3 + math.cos(a * D2R) * 2.75, 0.3 + math.sin(a * D2R) * 2.75
         b.slot(x, y, 0.4, a * D2R)
     for (x, y, f) in [(4.6, 1.6, -20), (5.1, -1.7, -50)]:
         b.slot(x, y, t.h(x, y), f * D2R)
@@ -682,7 +681,7 @@ def build_playground(b: Builder, t):
 # --------------------------------------------------------------------------------------
 
 SPEC_RESUME = {
-    "noise": 0.3, "dome": 0.6, "port_h": 0.5, "hub": (0.0, 0.6), "path_mat": "stone_light",
+    "noise": 0.3, "dome": 0.6, "port_h": 0.5, "hub": (0.0, 0.6), "path_mat": "stone_light", "road": True,
     "pads": [
         {"shape": "rect", "x": 0.0, "y": 0.9, "w": 6.0, "d": 4.0, "h": 0.8, "paved": "stone_light", "blend": 1.6},
         {"shape": "rect", "x": 2.0, "y": -2.1, "w": 3.8, "d": 1.2, "h": 0.35, "paved": "stone_mid", "blend": 1.2},
@@ -802,7 +801,7 @@ def build_contact(b: Builder, t):
     hx, hy = -2.0, -2.6
     hz = t.h(hx, hy)
     b.box("cream", (1.2, 0.9, 0.85), (hx, hy, hz - 0.1), rz=0.4, bevel=0.03)
-    b.add(bm_profile_extrude([(-0.7, 0), (0.7, 0), (0, 0.5)], 1.05), "orange", T(hx, hy, hz + 0.75, rz=0.4), obj="buildings")
+    b.add(bm_profile_extrude([(-0.7, 0), (0.7, 0), (0, 0.5)], 1.05), "roof_tile", T(hx, hy, hz + 0.75, rz=0.4), obj="buildings")
     b.occupy(hx, hy, 0.8)
 
     # lattice communication tower
@@ -851,21 +850,15 @@ def build_contact(b: Builder, t):
         start = Vector((2.2, -2.4, 0)) + side * off + dirv * (0.6 * k)
         z = 0.32
         end = start + dirv * length
-        n = int(length / 0.28)
-        for i in range(n):
-            p = start + dirv * (i * length / n)
-            b.add(bm_box(0.22, 1.2, 0.06, 0.01), "wood", T(p.x, p.y, z, rz=ang), obj="props")
-        b.beam("wood_dark", tuple(start + side * 0.45 + Vector((0, 0, z - 0.06))), tuple(end + side * 0.45 + Vector((0, 0, z - 0.06))), 0.12)
-        b.beam("wood_dark", tuple(start - side * 0.45 + Vector((0, 0, z - 0.06))), tuple(end - side * 0.45 + Vector((0, 0, z - 0.06))), 0.12)
-        for i in range(int(length / 1.2) + 1):
-            p = start + dirv * (i * 1.2)
-            for s in (-0.52, 0.52):
-                q = p + side * s
-                b.beam("wood_dark", (q.x, q.y, z + 0.5), (q.x, q.y, z - 2.6 - 0.3 * i), 0.13)
-                b.cyl("metal_dark", 0.06, 0.06, 0.32, (q.x, q.y, z + 0.03), segs=8, obj="props", detail=1)
+        # scanned timber pier sections (1.58 long, deck at z=0, origin at the landward end)
+        sec = 1.5
+        for i in range(max(1, round(length / sec))):
+            p = start + dirv * (i * sec)
+            b.prop("pier_end" if i % 2 else "pier", p.x, p.y, z + 0.04, ang + math.pi)  # front (-Y) faces land
+        end = start + dirv * (round(length / sec) * sec - 0.4)
         if k == 0:
-            lamp(b, end.x, end.y, z + 0.03, 1.2)
-            b.add(bm_box(1.6, 2.4, 0.08, 0.01), "wood", T(end.x, end.y, z, rz=ang), obj="props")
+            lamp(b, end.x + side.x * 0.42, end.y + side.y * 0.42, z + 0.04, 1.3, facing=ang)
+            b.prop("lantern", end.x - side.x * 0.42, end.y - side.y * 0.42, z + 0.04, ang)
         # moored boat (bobbing)
         bp = start + dirv * (length * 0.65) - side * (1.25 if k == 0 else -1.2)
         boat = b.separate(f"anim_bob_boat{k}", (bp.x, bp.y, z - 0.25))
@@ -881,10 +874,10 @@ def build_contact(b: Builder, t):
               T(bp.x + dirv.x * 0.22, bp.y + dirv.y * 0.22, z + 0.2, rz=ang + math.pi, rx=math.pi / 2), obj=boat)
     b.occupy(2.8, -3.0, 1.4)
     # boathouse
-    bx, by = 1.0, -2.9
+    bx, by = 0.3, -3.6
     bz = t.h(bx, by)
     b.box("wood", (1.4, 1.1, 0.9), (bx, by, bz - 0.1), rz=ang, bevel=0.02)
-    b.add(bm_profile_extrude([(-0.8, 0), (0.8, 0), (0, 0.55)], 1.3), "ink", T(bx, by, bz + 0.8, rz=ang + math.pi / 2),
+    b.add(bm_profile_extrude([(-0.8, 0), (0.8, 0), (0, 0.55)], 1.3), "roof_tile", T(bx, by, bz + 0.8, rz=ang + math.pi / 2),
           obj="buildings")
     b.occupy(bx, by, 0.9)
     # contact signboards
@@ -893,6 +886,83 @@ def build_contact(b: Builder, t):
         b.occupy(x, y, 0.45)
     for (x, y) in [(-4.8, 2.2), (4.8, 3.4), (-1.0, 4.8), (5.4, -1.6)]:
         plant(b, t, "palm", x, y, 1.0)
+
+
+# --------------------------------------------------------------------------------------
+# Golden sculptures: one per island (About also keeps its big gem), each a different shape,
+# turning slowly on a stepped stone plinth in view of the island's front.
+# --------------------------------------------------------------------------------------
+
+SCULPTURES = {"about": "crystals", "projects": "obelisk", "blogs": "ring", "research": "ico",
+              "playground": "double", "resume": "spire", "contact": "gem"}
+
+
+def _sculpture_shape(b, kind, x, y, z, obj):
+    G = "gold"
+    if kind == "gem":
+        b.add(bm_lathe([(0.0, -0.75), (0.5, 0.0), (0.4, 0.26), (0.2, 0.4), (0.0, 0.4)], 8), G, T(x, y, z, s=(1, 1, 1.2)),
+              obj=obj, smooth=False)
+    elif kind == "ico":
+        b.add(bm_ico(0.55, 1), G, T(x, y, z), obj=obj, smooth=False)
+    elif kind == "ring":
+        b.add(bm_torus(0.55, 0.11, 36, 8), G, T(x, y, z, rx=math.pi / 2), obj=obj, smooth=True)
+        b.add(bm_ico(0.18, 1), G, T(x, y, z), obj=obj, smooth=False)
+    elif kind == "double":
+        octa = [(0.0, -0.45), (0.36, 0.0), (0.0, 0.45)]
+        b.add(bm_lathe(octa, 4), G, T(x, y, z - 0.28), obj=obj, smooth=False)
+        b.add(bm_lathe(octa, 4), G, T(x, y, z + 0.42, rz=math.pi / 4, s=(0.75, 0.75, 0.75)), obj=obj, smooth=False)
+    elif kind == "obelisk":
+        b.add(bm_lathe([(0.0, -0.8), (0.26, -0.8), (0.18, 0.55), (0.0, 0.85)], 4), G, T(x, y, z, rz=math.pi / 4),
+              obj=obj, smooth=False)
+    elif kind == "spire":
+        b.add(bm_lathe([(0.0, -0.75), (0.34, -0.55), (0.16, 0.1), (0.24, 0.3), (0.0, 0.95)], 6), G, T(x, y, z),
+              obj=obj, smooth=False)
+    elif kind == "crystals":
+        rng = random.Random(7)
+        prism = [(0.0, 0.0), (0.12, 0.05), (0.12, 0.7), (0.0, 0.9)]
+        for k in range(6):
+            a = k / 6 * TAU + rng.uniform(-0.2, 0.2)
+            tilt = 0.0 if k == 0 else rng.uniform(0.3, 0.6)
+            sc = 1.5 if k == 0 else rng.uniform(0.7, 1.05)
+            b.add(bm_lathe(prism, 6), G, T(x + math.cos(a) * 0.08 * (k > 0), y + math.sin(a) * 0.08 * (k > 0), z - 0.65,
+                                           rz=a, ry=tilt, s=(sc, sc, sc)), obj=obj, smooth=False)
+
+
+def place_sculpture(b, t, iid, seed=0):
+    kind = SCULPTURES.get(iid)
+    if not kind:
+        return None
+    rng = random.Random(t.seed * 41 + seed)
+    best = None
+    # front half first (the side the signs and cameras face), then anywhere, then a tighter footprint
+    passes = [((-150, -30), 1.0, (0.35, 0.72)), ((-180, 180), 1.0, (0.3, 0.78)), ((-180, 180), 0.75, (0.25, 0.8))]
+    for _ in range(1800):
+        if best is not None and _ % 600 == 0:
+            break
+        (a0, a1), need, (r0, r1) = passes[min(2, _ // 600)]
+        ang = rng.uniform(a0, a1) * D2R
+        rr = rng.uniform(r0, r1)
+        r = t.r(ang) * rr
+        x, y = math.cos(ang) * r, math.sin(ang) * r
+        if not b.is_free(x, y, need) or t.in_water(x, y, 1.2):
+            continue
+        z = t.h(x, y)
+        slope = max(abs(t.h(x + 0.7, y) - z), abs(t.h(x - 0.7, y) - z), abs(t.h(x, y + 0.7) - z), abs(t.h(x, y - 0.7) - z))
+        score = slope + abs(rr - 0.55) * 0.3
+        if best is None or score < best[0]:
+            best = (score, x, y, z)
+    if best is None:
+        return None
+    _, x, y, z = best
+    z -= 0.08
+    b.box("stone_dark", (1.25, 1.25, 0.3), (x, y, z), bevel=0.04)
+    b.box("stone_light", (0.9, 0.9, 0.28), (x, y, z + 0.3), bevel=0.04)
+    b.box("gold", (0.62, 0.62, 0.05), (x, y, z + 0.58), bevel=0.01)
+    hz = z + 0.58 + 1.0
+    obj = b.separate(f"anim_spin_monument_{kind}", (x, y, hz))
+    _sculpture_shape(b, kind, x, y, hz, obj)
+    b.occupy(x, y, 0.95)
+    return (x, y)
 
 
 ISLANDS = {
