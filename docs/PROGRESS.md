@@ -95,6 +95,28 @@ These are intentionally procedural so they can be generated from Markdown:
   open sky), small props, pebbles and lawn tufts no longer render into the shadow map. In
   development `window.__world` exposes `{ gl, scene, camera }`.
 
+## 2d. Hero building detail pass (2026-11-20)
+
+- Shared facade helpers in `scripts/blender/generate_buildings.py`: framed windows with sills,
+  mullions, transoms and optional stone surrounds; double doors with canopies and steps; rooftop
+  plant (parapet and coping, membrane, air-handling units with fans and louvres, vent stacks,
+  skylights); pitched roofs with real eaves overhang, fascias, bargeboards, ridge cap and chimney.
+- New `window` material: opaque slate-blue glazing with a sky sheen. Lit rooms use `emit_warm`.
+- About HQ: curtain wall with a mullion grid, deep fins on the long faces and scattered lit
+  offices; glass balustrades on every terrace; glazed entrance; louvred service core with a roof
+  door; roof parapet with plant beside the garden.
+- Projects server halls: ribbed roller shutter under a hood, bollards, a personnel door with a
+  canopy, wall condensers and roof coping.
+- Blogs library: plinth and string course, tall framed reading-room windows with stone surrounds
+  on every face (two storeys), arched-bay windows round the archive rotunda.
+- Research: porthole windows, base course and door canopy on the observatory; rooftop plant on
+  the labs.
+- Resume gallery: lit entrance, skylights and vents. Playground workshop: framed shopfront
+  window, glazed double door and side windows. Contact: the keeper's cottage gets a stone
+  plinth stepping down the slope, door, windows, a tiled gable roof with chimney; the
+  boathouse gets barn doors and a gable roof; the comms hut a door, window and roof unit.
+- Island models grow by about 0.5 MB in total (LOD0 4.3 MB, LOD1 2.1 MB after meshopt).
+
 ## 3. Placeholder content and copy (replace with real material)
 
 - `src/config/site.ts`: role, bio, principles and the email address
@@ -108,9 +130,10 @@ These are intentionally procedural so they can be generated from Markdown:
 ## 4. Assets awaiting refinement
 
 - Contact island dock and pier geometry is busy close up; simplify the piling layout.
-- Building silhouettes are modular kit-bash (bevelled boxes, lathes, tubes).
-  They read well at portfolio zoom levels. Hero buildings would benefit from a
-  hand-modelling pass in the `.blend` sources (window insets, trims, roof detail).
+- Building massing is still modular (bevelled boxes, lathes, tubes). Facades now have
+  windows, doors, trims and roof detail (section 2d). Remaining candidates are the
+  Playground prototype stack and cantilever box, the Resume pavilion, and interiors
+  behind the lab glass.
 - Tree variants are stylised low-poly. Leaf cards or a denser crown would add realism.
 - Textures are generated tiling normal/roughness maps. Photographic PBR sets
   would add surface detail.

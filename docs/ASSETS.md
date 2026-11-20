@@ -64,6 +64,13 @@ these names if you edit a model by hand:
 Vertex colour `COLOR_0` carries a baked, ray-traced ambient occlusion pass.
 UVs are world-scale box projections so tiling textures line up across meshes.
 
+Facade detail comes from shared helpers at the top of `generate_buildings.py`:
+`sides()` returns a face frame per wall of a block (local −Y out of the wall), and
+`window()` / `window_row()`, `door()`, `roof_plant()` and `gable_roof()` build on
+those frames. Glazing panes (`M_window`, or `M_emit_warm` for lit rooms) go in
+`buildings` so they stay in LOD1. Frames, sills, mullions, louvres and rooftop
+fittings are `detail=1` and only appear on the high-detail model of the focused island.
+
 ## Material naming contract
 
 GLB materials are named `M_<preset>` (e.g. `M_stone_light`, `M_wood_dark`,
