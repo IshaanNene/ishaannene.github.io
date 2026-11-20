@@ -96,6 +96,8 @@ export const ENV_MATERIALS: Record<string, Def> = {
   wood: { color: "#f2c08c", rough: 1, metal: 0, pbr: "planks", repeat: 1.2, normalScale: 0.9 },
   wood_dark: { color: "#b48863", rough: 1, metal: 0, pbr: "planks", repeat: 1.2, normalScale: 0.9 },
   glass: { color: "#b9d5ef", rough: 0.05, metal: 0.1, kind: "glass" },
+  // facade glazing: opaque slate-blue glass with a sheen of the sky (not see-through, so no wall shows behind)
+  window: { color: "#8399ab", rough: 0.16, metal: 0.25 },
   water: { color: "#3a7bb3", rough: 0.06, metal: 0, kind: "water" },
   lime: { color: "#DFFF00", rough: 0.75, metal: 0, pbr: "plaster", pbrMean: 188, repeat: 0.8, normalScale: 0.5 },
   orange: { color: "#FF7043", rough: 0.75, metal: 0, pbr: "plaster", pbrMean: 188, repeat: 0.8, normalScale: 0.5 },

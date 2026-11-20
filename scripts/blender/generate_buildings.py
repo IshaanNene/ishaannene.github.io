@@ -92,6 +92,156 @@ def pergola(b, x, y, z, w, d, h=2.0, rz=0.0):
 
 
 # --------------------------------------------------------------------------------------
+# Facade details: windows, doors, rooftop plant and pitched-roof trim.
+# A face frame F has its origin at the bottom centre of a wall face; local x runs along the wall and
+# local -Y points out of it. Glazing stays in LOD1; frames, sills and small fittings are detail=1.
+# --------------------------------------------------------------------------------------
+
+def sides(M, w, d, which="snew"):
+    """Face frames of a w × d block centred on M: [(frame, face width)] for the sides in `which`."""
+    f = {"s": (M @ T(0, -d / 2, 0), w), "n": (M @ T(0, d / 2, 0, rz=math.pi), w),
+         "e": (M @ T(w / 2, 0, 0, rz=math.pi / 2), d), "w": (M @ T(-w / 2, 0, 0, rz=-math.pi / 2), d)}
+    return [f[k] for k in which]
+
+
+def window(b, F, x, z, ww, wh, frame="metal_dark", sill="stone_light", lit=False, bars=1, transom=False, surround=None):
+    """Framed window: the pane sits just proud of the wall, frame bars stand out around it, a sill below."""
+    b.add(bm_box(ww, 0.02, wh, 0), "emit_warm" if lit else "window", F @ T(x, -0.012, z), obj="buildings")
+    ft, fd = min(0.045, ww * 0.12), 0.05
+    for zz in (z - ft / 2, z + wh - ft / 2):
+        b.add(bm_box(ww + ft, fd, ft, 0), frame, F @ T(x, -fd / 2, zz), obj="props", detail=1)
+    for xx in (x - ww / 2, x + ww / 2):
+        b.add(bm_box(ft, fd, wh, 0), frame, F @ T(xx, -fd / 2, z), obj="props", detail=1)
+    for k in range(1, bars + 1):
+        b.add(bm_box(ft * 0.6, fd * 0.8, wh, 0), frame, F @ T(x - ww / 2 + k * ww / (bars + 1), -fd * 0.4, z), obj="props",
+              detail=1)
+    if transom:
+        b.add(bm_box(ww, fd * 0.8, ft * 0.6, 0), frame, F @ T(x, -fd * 0.4, z + wh * 0.72), obj="props", detail=1)
+    if surround:
+        s = 0.07
+        b.add(bm_box(ww + 2 * s + ft, 0.04, s, 0), surround, F @ T(x, -0.02, z + wh + ft / 2), obj="props", detail=1)
+        for xx in (x - ww / 2 - ft / 2 - s / 2, x + ww / 2 + ft / 2 + s / 2):
+            b.add(bm_box(s, 0.04, wh + ft / 2, 0), surround, F @ T(xx, -0.02, z), obj="props", detail=1)
+    if sill:
+        b.add(bm_box(ww + 0.14, 0.1, 0.04, 0), sill, F @ T(x, -0.05, z - ft / 2 - 0.04), obj="props", detail=1)
+
+
+def window_row(b, F, L, z, ww, wh, pitch, rng=None, lit=0.0, margin=0.3, skip=(), **kw):
+    """Evenly spaced windows along a face of width L (indices in `skip` are left blank)."""
+    n = max(1, int((L - 2 * margin) // pitch))
+    for k in range(n):
+        if k not in skip:
+            window(b, F, (k - (n - 1) / 2) * pitch, z, ww, wh, lit=bool(rng and rng.random() < lit), **kw)
+
+
+def door(b, F, x, z, dw=0.42, dh=0.72, leaf="wood_dark", surround="stone_light", canopy=None, step="stone_mid", glazed=False):
+    """Double door with a surround, an optional canopy and a step."""
+    b.add(bm_box(dw, 0.03, dh, 0), leaf, F @ T(x, -0.015, z), obj="buildings")
+    if glazed:
+        for sx in (-dw / 4, dw / 4):
+            b.add(bm_box(dw * 0.34, 0.012, dh * 0.62, 0), "window", F @ T(x + sx, -0.032, z + dh * 0.3), obj="props", detail=1)
+    b.add(bm_box(0.014, 0.04, dh, 0), "ink", F @ T(x, -0.02, z), obj="props", detail=1)
+    s = 0.06
+    if surround:
+        for xx in (x - dw / 2 - s / 2, x + dw / 2 + s / 2):
+            b.add(bm_box(s, 0.06, dh + s, 0), surround, F @ T(xx, -0.03, z), obj="props", detail=1)
+        b.add(bm_box(dw + 2 * s, 0.06, s, 0), surround, F @ T(x, -0.03, z + dh), obj="props", detail=1)
+    if canopy:
+        b.add(bm_box(dw + 0.36, 0.4, 0.045, 0.01), canopy, F @ T(x, -0.2, z + dh + 0.1), obj="buildings")
+        for xx in (x - dw / 2 - 0.12, x + dw / 2 + 0.12):
+            b.beam("metal_dark", F @ Vector((xx, -0.36, z + dh + 0.12)), F @ Vector((xx, -0.02, z + dh + 0.42)), 0.018,
+                   obj="props", detail=1)
+    if step:
+        b.add(bm_box(dw + 0.3, 0.28, 0.06, 0.01), step, F @ T(x, -0.14, z - 0.06), obj="buildings")
+
+
+def roof_plant(b, M, w, d, seed=0, parapet="concrete", ph=0.16, coping="metal", units=2, vents=3, skylights=0,
+               area=None, membrane=True):
+    """Roof furniture on a flat w × d roof whose surface is at M's origin: parapet with coping, membrane,
+    air-handling units with fans, vent stacks and skylights. `area` = (x0, x1, y0, y1) limits placement."""
+    rng = random.Random(seed)
+    t = 0.07 if ph else 0.0
+    if ph:
+        for F, L in sides(M, w, d):
+            b.add(bm_box(L, t, ph, 0), parapet, F @ T(0, t / 2, 0), obj="buildings")
+            if coping:
+                b.add(bm_box(L + 0.02, t + 0.03, 0.025, 0), coping, F @ T(0, t / 2, ph), obj="props", detail=1)
+    if membrane:
+        b.add(bm_box(w - 2 * t, d - 2 * t, 0.012, 0), "concrete_dark", M, obj="props")
+    x0, x1, y0, y1 = area or (-w / 2 + t, w / 2 - t, -d / 2 + t, d / 2 - t)
+    placed = []
+
+    def spot(sw, sd):
+        lo_x, hi_x, lo_y, hi_y = x0 + sw / 2 + 0.06, x1 - sw / 2 - 0.06, y0 + sd / 2 + 0.06, y1 - sd / 2 - 0.06
+        if lo_x > hi_x or lo_y > hi_y:
+            return None
+        for _ in range(40):
+            x, y = rng.uniform(lo_x, hi_x), rng.uniform(lo_y, hi_y)
+            if all(abs(x - px) > (sw + pw) / 2 + 0.08 or abs(y - py) > (sd + pd) / 2 + 0.08 for px, py, pw, pd in placed):
+                placed.append((x, y, sw, sd))
+                return x, y
+        return None
+
+    for _ in range(units):
+        uw, ud, uh = rng.choice([(0.62, 0.42, 0.32), (0.5, 0.36, 0.28), (0.8, 0.44, 0.34)])
+        p = spot(uw, ud)
+        if not p:
+            continue
+        U = M @ T(p[0], p[1], 0)
+        b.add(bm_box(uw, ud, 0.05, 0), "metal_dark", U, obj="props")  # plinth rails
+        b.add(bm_box(uw, ud, uh, 0.012), "metal", U @ T(0, 0, 0.05), obj="props")
+        fx = uw / 2 - ud / 2
+        b.add(bm_cyl(ud * 0.36, ud * 0.36, 0.04, 14), "metal_dark", U @ T(fx, 0, 0.05 + uh), obj="props")
+        b.add(bm_cyl(ud * 0.08, ud * 0.08, 0.05, 8), "metal", U @ T(fx, 0, 0.06 + uh), obj="props", detail=1)
+        for k in range(4):  # louvres on the long side
+            b.add(bm_box(uw * 0.5, 0.015, 0.025, 0), "metal_dark", U @ T(-uw * 0.15, -ud / 2 - 0.006, 0.1 + k * uh * 0.2),
+                  obj="props", detail=1)
+    for _ in range(skylights):
+        p = spot(0.62, 0.42)
+        if not p:
+            continue
+        S = M @ T(p[0], p[1], 0)
+        b.add(bm_box(0.62, 0.42, 0.08, 0), "concrete_light", S, obj="props")
+        b.add(bm_profile_extrude([(-0.27, 0), (0.27, 0), (0, 0.12)], 0.36), "window", S @ T(0, 0, 0.08, rz=math.pi / 2),
+              obj="props")
+    for _ in range(vents):
+        p = spot(0.12, 0.12)
+        if not p:
+            continue
+        h = rng.uniform(0.16, 0.32)
+        b.add(bm_cyl(0.035, 0.035, h, 8), "metal", M @ T(p[0], p[1], 0), obj="props", detail=1)
+        b.add(bm_cyl(0.065, 0.065, 0.03, 8), "metal_dark", M @ T(p[0], p[1], h), obj="props", detail=1)
+
+
+def gable_roof(b, M, w, d, rise, over=0.12, mat="roof_tile", trim="wood_dark", gable="cream", chimney=None):
+    """Pitched roof on a w (span, local x) × d (ridge, local y) block whose eaves line is at M's origin:
+    gable walls, two roof slabs with overhang, ridge cap, fascias and bargeboards, optional chimney (x, y)."""
+    b.add(bm_profile_extrude([(-w / 2, 0), (w / 2, 0), (0, rise)], d), gable, M, obj="buildings")
+    a = math.atan2(rise, w / 2)
+    run = w / 2 + over
+    L = run / math.cos(a)
+    th = 0.05
+    for s in (-1, 1):
+        cx = s * run / 2
+        cz = rise - run / 2 * math.tan(a) + th / 2 / math.cos(a)
+        b.add(bm_box(L + 0.03, d + 2 * over, th, 0, center=True), mat, M @ T(cx, 0, cz, ry=s * a), obj="buildings")
+        ez = rise - run * math.tan(a)
+        b.add(bm_box(0.035, d + 2 * over + 0.02, 0.07, 0), trim, M @ T(s * (run + 0.01), 0, ez - 0.03), obj="props",
+              detail=1)
+        for sy in (-1, 1):  # bargeboards
+            y = sy * (d / 2 + over + 0.012)
+            b.beam(trim, M @ Vector((0, y, rise + th + 0.01)), M @ Vector((s * (run + 0.02), y, ez + 0.02)), 0.03,
+                   0.08, obj="props", detail=1)
+    b.add(bm_box(0.09, d + 2 * over + 0.03, 0.06, 0), trim, M @ T(0, 0, rise + th - 0.01), obj="buildings")
+    if chimney:
+        x, y = chimney
+        z0 = rise * (1 - abs(x) / (w / 2)) - 0.1
+        b.add(bm_box(0.2, 0.2, rise - z0 + 0.32, 0.01), "stone_mid", M @ T(x, y, z0), obj="buildings")
+        b.add(bm_box(0.26, 0.26, 0.05, 0), "concrete_dark", M @ T(x, y, rise + 0.22), obj="props", detail=1)
+        b.add(bm_cyl(0.035, 0.035, 0.1, 8), "concrete_dark", M @ T(x + 0.04, y, rise + 0.27), obj="props", detail=1)
+
+
+# --------------------------------------------------------------------------------------
 # ABOUT — brutalist headquarters
 # --------------------------------------------------------------------------------------
 
@@ -119,32 +269,53 @@ def build_about(b: Builder, t):
         (3.8, 3.8, -0.2, 0.1), (5.0, 2.8, -0.6, 0.0), (2.8, 2.8, 0.3, 0.2),
     ]
     z = z0 + 0.55
+    rng = random.Random(11)
     for i, (w, d, ox, oy) in enumerate(floors):
         gh, sh = 0.64, 0.34
-        b.box("glass", (w - 0.4, d - 0.4, gh), (cx + ox, cy + oy, z), bevel=0.0)
-        if i % 2 == 0:
-            b.box("emit_warm", (w - 0.6, d - 0.6, gh - 0.08), (cx + ox, cy + oy, z + 0.04), bevel=0.0, detail=1)
-        else:
-            b.box("concrete_dark", (w - 0.6, d - 0.6, gh - 0.04), (cx + ox, cy + oy, z + 0.02), bevel=0.0, detail=1)
-        # vertical fins along the long faces
-        if b.lod == 0:
-            n = int(w / 0.42)
+        gw, gd = w - 0.4, d - 0.4
+        M = T(cx + ox, cy + oy, z)
+        # curtain wall: reflective glazing, a mullion grid (deep concrete fins on the long faces), lit offices
+        b.box("window", (gw, gd, gh), (cx + ox, cy + oy, z), bevel=0.0)
+        for F, L in sides(M, gw, gd):
+            n = max(2, round(L / 0.42))
+            fin = L >= 2.6
+            for k in range(n):
+                if rng.random() < (0.3 if i % 2 == 0 else 0.14):
+                    b.add(bm_box(L / n - 0.07, 0.01, gh - 0.16, 0), "emit_warm", F @ T((k + 0.5 - n / 2) * L / n, -0.006, 0.08),
+                          obj="buildings")
             for k in range(n + 1):
-                fx = cx + ox - (w - 0.5) / 2 + k * (w - 0.5) / n
-                for fy in (cy + oy - (d - 0.4) / 2 - 0.05, cy + oy + (d - 0.4) / 2 + 0.05):
-                    b.box("concrete", (0.06, 0.22, gh), (fx, fy, z), bevel=0.0, obj="props", detail=1)
+                x = (k - n / 2) * L / n
+                if fin:
+                    b.add(bm_box(0.06, 0.22, gh, 0), "concrete", F @ T(x, -0.11, 0), obj="props", detail=1)
+                else:
+                    b.add(bm_box(0.04, 0.05, gh, 0), "metal_dark", F @ T(x, -0.025, 0), obj="props", detail=1)
+            for zz in (0.0, gh - 0.035):  # head and sill rails
+                b.add(bm_box(L, 0.05, 0.035, 0), "metal_dark", F @ T(0, -0.025, zz), obj="props", detail=1)
+        if i == 0:  # glazed entrance under the canopy
+            door(b, sides(M, gw, gd, "s")[0][0], 0.0, 0.0, dw=0.9, dh=0.56, leaf="metal_dark", surround="metal_dark",
+                 step=None, glazed=True)
         z += gh
         b.box("concrete", (w, d, sh), (cx + ox, cy + oy, z), bevel=0.05)
-        # parapet up-stand on cantilevers
-        b.box("concrete_light", (w, 0.08, 0.12), (cx + ox, cy + oy - d / 2 + 0.04, z + sh), bevel=0.0, detail=1)
+        b.box("concrete_dark", (w - 0.06, d - 0.06, 0.04), (cx + ox, cy + oy, z - 0.005), bevel=0.0, obj="props", detail=1)
         z += sh
+        if i < len(floors) - 1:
+            # terrace edge: frameless glass balustrade with a steel handrail
+            for F, L in sides(T(cx + ox, cy + oy, z), w - 0.12, d - 0.12):
+                b.add(bm_box(L, 0.02, 0.2, 0), "glass", F @ T(0, 0.01, 0), obj="props", detail=1)
+                b.add(bm_box(L, 0.035, 0.025, 0), "metal", F @ T(0, 0.01, 0.2), obj="props", detail=1)
     top = z
-    # service core
+    # service core: louvred plant floors, a roof door and the lime band
     b.box("concrete_dark", (1.4, 1.4, top - z0 + 1.6), (cx + 1.6, cy + 0.9, z0), bevel=0.04)
     b.box("lime", (1.46, 1.46, 0.28), (cx + 1.6, cy + 0.9, top + 1.05), bevel=0.0)
-    b.box("concrete_dark", (0.9, 3.0, 0.2), (cx - 0.6, cy + 0.2, top), bevel=0.02)
-    # roof garden + mast
-    b.box("grass", (2.2, 2.2, 0.08), (cx + 0.3, cy + 0.2, top), bevel=0.0, obj="props")
+    for F, L in sides(T(cx + 1.6, cy + 0.9, top + 0.35), 1.4, 1.4, "sew"):
+        for k in range(6):
+            b.add(bm_box(0.9, 0.04, 0.03, 0), "metal", F @ T(0, -0.02, 0.1 + k * 0.09, rx=-0.5), obj="props", detail=1)
+    door(b, sides(T(cx + 1.6, cy + 0.9, top), 1.4, 1.4, "w")[0][0], 0.2, 0.0, dw=0.34, dh=0.6, leaf="metal",
+         surround="concrete", step=None)
+    # roof: parapet, plant and a garden on the west half
+    roof_plant(b, T(cx + 0.3, cy + 0.2, top), 2.8, 2.8, seed=5, units=2, vents=3, area=(0.1, 1.33, -1.33, -0.05))
+    b.box("concrete_light", (1.3, 2.5, 0.12), (cx - 0.48, cy + 0.2, top), bevel=0.0, obj="props")
+    b.box("grass", (1.18, 2.38, 0.06), (cx - 0.48, cy + 0.2, top + 0.08), bevel=0.0, obj="props")
     b.cyl("metal", 0.05, 0.02, 2.4, (cx + 1.6, cy + 0.9, top + 1.6), segs=6, obj="props")
     b.add(bm_box(0.12, 0.12, 0.12, 0), "emit_lime", T(cx + 1.6, cy + 0.9, top + 4.0), obj="props")
     b.label = Vector((cx, cy, top + 2.6))
@@ -215,9 +386,31 @@ def server_hall(b, x, y, z, w, d, h, rz=0.0):
             b.add(bm_box(0.05, 0.06, h - 0.1), "metal_dark", M @ T(px, py, 0.25), obj="props", detail=1)
     # status light strip + louvres
     b.add(bm_box(w * 0.86, 0.04, 0.06, 0), "emit_lime", M @ T(0, -d / 2 - 0.02, 0.2 + h * 0.78), obj="props")
-    b.add(bm_box(w * 0.5, 0.04, 0.35, 0), "metal_dark", M @ T(-w * 0.15, -d / 2 - 0.03, 0.4), obj="props")
+    b.add(bm_box(w * 0.3, 0.04, 0.35, 0), "metal_dark", M @ T(-w * 0.05, -d / 2 - 0.03, 0.4), obj="props")
+    # loading bay: ribbed roller shutter under a steel hood, a personnel door and bollards
+    S = sides(M, w - 0.1, d - 0.1, "s")[0][0] @ T(0, 0, 0.2)
+    sw, sh = 0.82, min(0.95, h * 0.68)
+    sx = w * 0.3
+    b.add(bm_box(sw, 0.03, sh, 0), "metal", S @ T(sx, -0.05, 0), obj="buildings")
+    for k in range(int(sh / 0.07)):
+        b.add(bm_box(sw, 0.012, 0.018, 0), "metal_dark", S @ T(sx, -0.068, 0.04 + k * 0.07), obj="props", detail=1)
+    for xx in (sx - sw / 2 - 0.03, sx + sw / 2 + 0.03):
+        b.add(bm_box(0.05, 0.07, sh + 0.05, 0), "metal_dark", S @ T(xx, -0.06, 0), obj="props", detail=1)
+    b.add(bm_box(sw + 0.14, 0.14, 0.12, 0.01), "metal_dark", S @ T(sx, -0.1, sh), obj="buildings")
+    for xx in (sx - sw / 2 - 0.12, sx + sw / 2 + 0.12):
+        b.add(bm_cyl(0.04, 0.04, 0.32, 10), "orange", S @ T(xx, -0.3, -0.2), obj="props", detail=1)
+    door(b, S, -w / 2 + 0.32, 0.0, dw=0.3, dh=0.62, leaf="metal", surround="metal_dark", canopy="metal_dark",
+         step="concrete_dark")
+    # condensers on the end wall
+    E = sides(M, w - 0.1, d - 0.1, "e")[0][0] @ T(0, 0, 0.2)
+    for k in range(2):
+        y = (k - 0.5) * d * 0.45
+        b.add(bm_box(0.42, 0.2, 0.34, 0.01), "metal", E @ T(y, -0.12, 0.1), obj="props")
+        b.add(bm_cyl(0.12, 0.12, 0.02, 14), "metal_dark", E @ T(y, -0.22, 0.27, rx=math.pi / 2), obj="props", detail=1)
     # roof plant
     b.add(bm_box(w, d, 0.12, 0.02), "concrete_dark", M @ T(0, 0, 0.2 + h), obj="buildings")
+    for F, L in sides(M @ T(0, 0, 0.32 + h), w, d):
+        b.add(bm_box(L + 0.02, 0.05, 0.05, 0), "metal", F @ T(0, 0.02, 0), obj="props", detail=1)
     for k in range(3):
         px = -w / 3 + k * w / 3
         b.add(bm_cyl(0.3, 0.3, 0.32, 16), "metal", M @ T(px, 0, 0.32 + h), obj="props", smooth=True)
@@ -385,6 +578,19 @@ def build_blogs(b: Builder, t):
     b.box("stone_mid", (6.6, 3.6, 0.35), (cx, cy, z0), bevel=0.04, occupy=True)
     b.stairs("stone_light", (cx, cy - 2.05, z0), 3.4, 0.5, 0.35, 3)
     b.box("stone_light", (5.6, 2.3, 2.7), (cx, cy + 0.55, z0 + 0.35), bevel=0.04)
+    # plinth course, string course and tall reading-room windows on every face
+    rng = random.Random(21)
+    LB = T(cx, cy + 0.55, z0 + 0.35)
+    b.add(bm_box(5.7, 2.4, 0.26, 0.02), "stone_mid", LB, obj="buildings")
+    b.add(bm_box(5.68, 2.38, 0.08, 0.01), "stone_mid", LB @ T(0, 0, 1.68), obj="props", detail=1)
+    lib_win = dict(frame="metal_dark", sill="stone_mid", surround="stone_mid", bars=1, transom=True)
+    for F, L in sides(LB, 5.6, 2.3, "new"):
+        pitch = 0.78 if L > 3 else 0.72
+        window_row(b, F, L, 0.42, 0.36, 1.08, pitch, rng, lit=0.35, margin=0.32, **lib_win)
+        window_row(b, F, L, 1.92, 0.36, 0.5, pitch, rng, lit=0.2, margin=0.32, frame="metal_dark", sill=None, bars=1)
+    front = sides(LB, 5.6, 2.3, "s")[0][0]
+    for x in (-2.19, -1.46, 1.46, 2.19):  # either side of the entrance
+        window(b, front, x, 0.42, 0.34, 1.08, lit=rng.random() < 0.4, **lib_win)
     # clerestory + warm interior
     b.box("glass", (4.8, 0.08, 0.55), (cx, cy - 0.62, z0 + 2.15), bevel=0.0)
     b.box("emit_warm", (4.6, 0.04, 0.45), (cx, cy - 0.56, z0 + 2.2), bevel=0.0, detail=1)
@@ -415,6 +621,9 @@ def build_blogs(b: Builder, t):
         a = TAU * k / 12
         b.add(bm_box(0.16, 0.12, 2.0, 0.01), "stone_mid", T(rx + math.cos(a) * 1.28, ry + math.sin(a) * 1.28, rz0 + 0.2,
                                                              rz=a), obj="props", detail=1)
+        ab = a + math.pi / 12  # tall windows in the bays between pilasters
+        window(b, T(rx + math.cos(ab) * 1.265, ry + math.sin(ab) * 1.265, rz0 + 0.2, rz=ab + math.pi / 2), 0, 0.55, 0.3,
+               1.0, sill="stone_mid", lit=k % 4 == 1, bars=0, transom=True)
     dome = [(1.38 * math.cos(a), 1.38 * math.sin(a)) for a in [i * math.pi / 2 / 10 for i in range(11)]]
     b.lathe("mint", [(r, z) for r, z in dome], (rx, ry, rz0 + 2.2), segs=32)
     b.cyl("stone_light", 1.42, 1.42, 0.14, (rx, ry, rz0 + 2.15), segs=32, smooth=False)
@@ -499,6 +708,12 @@ def build_research(b: Builder, t):
     b.cyl("ink", 0.45, 0.45, 0.06, (ox, oy - 1.48, oz + 0.0), segs=4, detail=1)
     b.box("ink", (0.7, 0.06, 1.0), (ox, oy - 1.52, oz), bevel=0.0)
     b.box("emit_warm", (0.55, 0.04, 0.85), (ox, oy - 1.5, oz + 0.05), bevel=0.0)
+    b.box("concrete_light", (1.0, 0.4, 0.06), (ox, oy - 1.66, oz + 1.06), bevel=0.01)
+    b.cyl("concrete_light", 1.6, 1.6, 0.14, (ox, oy, oz - 0.02), segs=40, smooth=False)  # base course
+    for deg in (-30, 30, 90, 150, 210):  # porthole windows round the drum
+        a = deg * D2R
+        window(b, T(ox + math.cos(a) * 1.545, oy + math.sin(a) * 1.545, oz, rz=a + math.pi / 2), 0, 0.72, 0.24, 0.32,
+               sill="concrete_light", lit=deg in (30, 150), bars=0)
     dome = b.separate("anim_spin_dome", (ox, oy, oz + 1.59))
     slit = 0.2
     outer = [(1.5 * math.cos(a), 1.5 * math.sin(a)) for a in [i * math.pi / 2 / 12 for i in range(13)]]
@@ -515,8 +730,8 @@ def build_research(b: Builder, t):
     lab(b, 0.3, 0.3, 0.5, 2.4, 1.7, 1.35)
     lab(b, 2.6, 0.6, 0.5, 1.7, 1.5, 1.0, warm=False)
     lab(b, 2.6, 0.6, 1.84, 1.9, 1.5, 0.9)
-    b.box("concrete_dark", (0.5, 0.5, 0.5), (0.9, 0.5, 2.03), bevel=0.02, obj="props")
-    b.cyl("metal", 0.18, 0.18, 0.5, (-0.2, 0.6, 2.03), segs=12, obj="props")
+    roof_plant(b, T(0.3, 0.3, 2.19), 2.9, 2.2, seed=31, parapet="concrete_light", ph=0.12, units=2, vents=2, skylights=1)
+    roof_plant(b, T(2.6, 0.6, 3.08), 2.4, 2.0, seed=32, parapet="concrete_light", ph=0.12, units=1, vents=2)
 
     # radio dish (rotating)
     dx, dy = 3.4, 3.0
@@ -588,8 +803,12 @@ def build_playground(b: Builder, t):
     b.add(bm_box(3.4, 2.4, 0.3, 0.03), "concrete_dark", M, obj="buildings")
     b.add(bm_box(3.2, 2.2, 1.2, 0.03), "cream", M @ T(0, 0, 0.3), obj="buildings")
     b.add(bm_box(3.22, 2.22, 0.3, 0.0), "blue", M @ T(0, 0, 0.3), obj="buildings")
-    b.add(bm_box(1.0, 0.05, 0.8, 0), "glass", M @ T(-0.6, -1.11, 0.62), obj="buildings")
-    b.add(bm_box(0.9, 0.03, 0.7, 0), "emit_warm", M @ T(-0.6, -1.08, 0.66), obj="props")
+    WS, WE, WW = sides(M @ T(0, 0, 0.3), 3.2, 2.2, "sew")
+    window(b, WS[0], -0.6, 0.36, 1.0, 0.7, frame="ink", sill="concrete_light", bars=2, transom=True, lit=True)
+    door(b, WS[0], 0.75, 0.0, dw=0.6, dh=0.82, leaf="metal", surround="ink", step="concrete_dark", glazed=True)
+    rng = random.Random(61)
+    for F, L in (WE, WW):
+        window_row(b, F, L, 0.45, 0.42, 0.5, 0.72, rng, lit=0.4, frame="ink", sill="concrete_light", bars=1)
     for k in range(4):
         x0 = -1.6 + k * 0.8
         prof = [(x0, 0), (x0 + 0.8, 0), (x0, 0.62)]
@@ -717,7 +936,8 @@ def build_resume(b: Builder, t):
     b.add(bm_box(3.6, 1.8, 0.16, 0.02), "concrete_light", M @ T(0, 0, 1.75), obj="buildings")
     for k in range(8):
         b.add(bm_box(0.12, 0.08, 1.5, 0.0), "concrete_light", M @ T(-1.55 + k * 3.1 / 7, -0.77, 0.25), obj="props")
-    b.add(bm_box(0.8, 0.04, 1.0, 0.0), "emit_warm", M @ T(0, -0.76, 0.3), obj="props")
+    door(b, M @ T(0, -0.75, 0.25), 0.0, 0.0, dw=0.3, dh=1.0, leaf="emit_warm", surround=None, step="stone_mid")
+    roof_plant(b, M @ T(0, 0, 1.91), 3.6, 1.8, seed=41, parapet="concrete_light", ph=0.1, units=0, vents=2, skylights=3)
     b.occupy(hx, hy, 1.9)
     # achievement pillars (stepped obelisks)
     for i, h in enumerate([1.4, 2.0, 2.6, 3.2, 3.9]):
@@ -800,8 +1020,17 @@ def build_contact(b: Builder, t):
     # keeper's house
     hx, hy = -2.0, -2.6
     hz = t.h(hx, hy)
+    HM = T(hx, hy, hz - 0.1, rz=0.4)
     b.box("cream", (1.2, 0.9, 0.85), (hx, hy, hz - 0.1), rz=0.4, bevel=0.03)
-    b.add(bm_profile_extrude([(-0.7, 0), (0.7, 0), (0, 0.5)], 1.05), "roof_tile", T(hx, hy, hz + 0.75, rz=0.4), obj="buildings")
+    b.add(bm_box(1.24, 0.94, 0.66, 0.01), "stone_mid", HM @ T(0, 0, -0.5), obj="buildings")  # plinth into the slope
+    gable_roof(b, HM @ T(0, 0, 0.85), 1.2, 0.9, 0.5, over=0.1, chimney=(0.32, 0.18))
+    hs, hn, he, hw_ = sides(HM, 1.2, 0.9, "snew")
+    cottage = dict(frame="cream", sill="stone_light", bars=1, transom=True)
+    door(b, hs[0], -0.27, 0.1, dw=0.24, dh=0.5, leaf="blue", surround="stone_light", step=None)
+    b.add(bm_box(0.46, 0.26, 0.6, 0.01), "stone_mid", hs[0] @ T(-0.27, -0.13, -0.5), obj="buildings")  # stoop
+    window(b, hs[0], 0.25, 0.36, 0.28, 0.28, lit=True, **cottage)
+    for F, _ in (hn, he, hw_):
+        window(b, F, 0.0, 0.36, 0.26, 0.28, **cottage)
     b.occupy(hx, hy, 0.8)
 
     # lattice communication tower
@@ -839,7 +1068,11 @@ def build_contact(b: Builder, t):
     uz = t.h(ux, uy)
     b.box("concrete_light", (1.3, 1.0, 0.95), (ux, uy, uz - 0.1), rz=-0.2, bevel=0.04)
     b.box("blue", (1.32, 1.02, 0.18), (ux, uy, uz + 0.55), rz=-0.2, bevel=0.0)
-    b.box("emit_warm", (0.5, 0.04, 0.45), (ux - 0.1, uy - 0.52, uz + 0.05), rz=-0.2, bevel=0.0)
+    UM = T(ux, uy, uz - 0.1, rz=-0.2)
+    US = sides(UM, 1.3, 1.0, "s")[0][0]
+    door(b, US, 0.36, 0.1, dw=0.28, dh=0.55, leaf="metal", surround="metal_dark", step="concrete_dark")
+    window(b, US, -0.22, 0.32, 0.38, 0.26, lit=True, bars=2, sill="concrete_light")
+    roof_plant(b, UM @ T(0, 0, 0.95), 1.3, 1.0, seed=51, ph=0, units=1, vents=1, membrane=False)
     b.occupy(ux, uy, 0.9)
 
     # sky harbour: piers cantilevered off the beach into the void
@@ -876,9 +1109,12 @@ def build_contact(b: Builder, t):
     # boathouse
     bx, by = 0.3, -3.6
     bz = t.h(bx, by)
+    BM = T(bx, by, bz - 0.1, rz=ang)
     b.box("wood", (1.4, 1.1, 0.9), (bx, by, bz - 0.1), rz=ang, bevel=0.02)
-    b.add(bm_profile_extrude([(-0.8, 0), (0.8, 0), (0, 0.55)], 1.3), "roof_tile", T(bx, by, bz + 0.8, rz=ang + math.pi / 2),
-          obj="buildings")
+    gable_roof(b, BM @ T(0, 0, 0.9, rz=math.pi / 2), 1.1, 1.4, 0.5, over=0.1, gable="wood")
+    E = sides(BM, 1.4, 1.1, "e")[0][0]
+    door(b, E, 0.0, 0.1, dw=0.62, dh=0.62, leaf="wood_dark", surround="wood_dark", step=None)
+    window(b, sides(BM, 1.4, 1.1, "s")[0][0], 0.1, 0.42, 0.34, 0.26, frame="wood_dark", sill="wood_dark")
     b.occupy(bx, by, 0.9)
     # contact signboards
     for (x, y) in [(-1.1, -0.9), (0.6, -1.4), (2.3, -0.8)]:

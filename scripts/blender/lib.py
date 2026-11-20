@@ -60,6 +60,7 @@ MATERIALS = {
     "wood":           ("#9C6B43", 0.8, 0.0, 0),
     "wood_dark":      ("#5B3C27", 0.85, 0.0, 0),
     "glass":          ("#A9C9E8", 0.05, 0.1, 0),
+    "window":         ("#2F3D4A", 0.1, 0.6, 0),   # opaque reflective glazing set in facades
     "water":          ("#3B7CB4", 0.05, 0.0, 0),
     "lime":           ("#DFFF00", 0.6, 0.0, 0),
     "orange":         ("#FF7043", 0.6, 0.0, 0),
