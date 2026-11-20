@@ -11,8 +11,8 @@
     "assets:blender": ".venv-blender/bin/python scripts/blender/export_assets.py",
     "assets:optimize": "node scripts/optimize-glb.mjs",
     "assets:vegetation": ".venv-blender/bin/python scripts/blender/build_vegetation.py && gltf-transform resize public/models/vegetation/vegetation.glb public/models/vegetation/vegetation.glb --width 512 --height 512 && gltf-transform webp public/models/vegetation/vegetation.glb public/models/vegetation/vegetation.glb --quality 82 && node scripts/optimize-glb.mjs",
-    "assets:cliffs": ".venv-blender/bin/python scripts/blender/build_cliffs.py && gltf-transform resize public/models/cliffs/cliffs.glb public/models/cliffs/cliffs.glb --width 1024 --height 1024 && gltf-transform webp public/models/cliffs/cliffs.glb public/models/cliffs/cliffs.glb --quality 80 && node scripts/optimize-glb.mjs",
-    "assets:props": ".venv-blender/bin/python scripts/blender/build_props.py && gltf-transform resize public/models/props/props.glb public/models/props/props.glb --width 512 --height 512 && gltf-transform webp public/models/props/props.glb public/models/props/props.glb --quality 82 && node scripts/optimize-glb.mjs",
+    "assets:cliffs": ".venv-blender/bin/python scripts/blender/build_cliffs.py && gltf-transform resize public/models/cliffs/cliffs.glb public/models/cliffs/cliffs.glb --width 512 --height 512 && gltf-transform webp public/models/cliffs/cliffs.glb public/models/cliffs/cliffs.glb --quality 80 && node scripts/optimize-glb.mjs",
+    "assets:props": ".venv-blender/bin/python scripts/blender/build_props.py && gltf-transform resize public/models/props/props.glb public/models/props/props.glb --width 256 --height 256 && gltf-transform webp public/models/props/props.glb public/models/props/props.glb --quality 82 && node scripts/optimize-glb.mjs",
     "assets": "npm run assets:blender && npm run assets:optimize"
   },
   "dependencies": {

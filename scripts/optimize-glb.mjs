@@ -4,6 +4,9 @@
  * Run after `npm run assets:blender`. Node names and material names
  * (M_<preset>) are preserved, so the runtime material swap keeps working.
  * Already-compressed files are skipped (EXT_meshopt_compression present).
+ *
+ *   node scripts/optimize-glb.mjs                  # new exports only
+ *   node scripts/optimize-glb.mjs --force islands  # recompress selected folders
  */
 import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -12,6 +15,7 @@ import { join } from "node:path";
 const root = new URL("../public/models/", import.meta.url).pathname;
 const bin = new URL("../node_modules/.bin/gltf-transform", import.meta.url).pathname;
 const force = process.argv.includes("--force");
+const only = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 
 function* walk(dir) {
   for (const f of readdirSync(dir)) {
@@ -24,6 +28,8 @@ function* walk(dir) {
 let before = 0;
 let after = 0;
 for (const file of walk(root)) {
+  const rel = file.replace(root, "");
+  if (only.length && !only.some((o) => rel.startsWith(o))) continue;
   const size = statSync(file).size;
   const buf = readFileSync(file);
   // GLB: 12-byte header, then the JSON chunk (length at byte 12)
