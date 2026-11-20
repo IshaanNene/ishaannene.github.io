@@ -69,7 +69,9 @@ function IslandLOD({ id, mats, forceHigh, interactive, islandY }: { id: Destinat
   useFrame(({ camera }) => {
     if (forceHigh) return;
     const dist = camera.position.distanceTo(tmp.set(...d.position));
-    const loadAt = d.radius * (quality === "high" ? 6.5 : 4.5) + 14;
+    // ~39 units on high quality: the focused island and its close neighbours. Further out the full
+    // model's extra detail (window frames, fittings, finer terrain) is sub-pixel, so LOD1 is enough.
+    const loadAt = d.radius * (quality === "high" ? 3.6 : 2.8) + 12;
     const isNear = dist < loadAt || selected === id;
     if (isNear && !wantHigh) setWantHigh(true);
     if (isNear !== near && (isNear || dist > loadAt * 1.15)) setNear(isNear);

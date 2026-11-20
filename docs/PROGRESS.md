@@ -116,6 +116,27 @@ These are intentionally procedural so they can be generated from Markdown:
   plinth stepping down the slope, door, windows, a tiled gable roof with chimney; the
   boathouse gets barn doors and a gable roof; the comms hut a door, window and roof unit.
 - Island models grow by about 0.5 MB in total (LOD0 4.3 MB, LOD1 2.1 MB after meshopt).
+- Second pass: the Playground prototype stack is now four windowed studio blocks with metal
+  copings and a glass-railed roof terrace with a parasol; the cantilever studio has ribbon
+  windows and a raking steel strut back to its pylon. The Resume pavilion has cruciform chrome
+  columns, chrome glazing bars, a shadow reveal and downlights in the roof soffit. The Research
+  labs are furnished behind the glass: back wall, benches with screens and instruments, racks
+  with status lights and ceiling light strips. About 0.17 MB more.
+
+## 2e. Harbour fix and lighter first load (2026-11-20)
+
+- Contact's sky harbour is rebuilt: the piers used to start ~3 units inland, so their sections
+  lay across the lawn and beach and overlapped, the moored boats sat on the sand and rim trees
+  grew through them. Each pier is now rooted on the beach just inside the rim and runs straight
+  out into the void (`harbour` in `SPEC_CONTACT`), with plain sections and an end section only at
+  the tip, a lamp and lantern at the end and its boat moored alongside. The landward ends are
+  reserved so trees and props keep off, and rim greenery skips the harbour.
+- First load ~17 MB → 9.7 MB of models, textures and fonts (measured on a cold overview load):
+  - Full-detail island models now load within ~39 units (high quality) instead of ~63, so the
+    overview loads only LOD1 and focusing an island fetches it and its close neighbours.
+  - Cliff scans use 512 px textures (2.9 MB → 1.0 MB, about a quarter of the VRAM) and props
+    256 px (2.1 MB → 0.96 MB); the budgets live in the `assets:cliffs` / `assets:props` scripts.
+  - `node scripts/optimize-glb.mjs --force <folder>` recompresses just the named folders.
 
 ## 3. Placeholder content and copy (replace with real material)
 
@@ -129,16 +150,14 @@ These are intentionally procedural so they can be generated from Markdown:
 
 ## 4. Assets awaiting refinement
 
-- Contact island dock and pier geometry is busy close up; simplify the piling layout.
 - Building massing is still modular (bevelled boxes, lathes, tubes). Facades now have
-  windows, doors, trims and roof detail (section 2d). Remaining candidates are the
-  Playground prototype stack and cantilever box, the Resume pavilion, and interiors
-  behind the lab glass.
+  windows, doors, trims and roof detail on every island (section 2d).
 - Tree variants are stylised low-poly. Leaf cards or a denser crown would add realism.
 - Textures are generated tiling normal/roughness maps. Photographic PBR sets
   would add surface detail.
-- Large first load: about 6.8 MB of models after meshopt. LOD1 loads first. Possible
-  next steps are KTX2 textures and splitting `about.glb` further.
+- First load is about 9.7 MB (section 2e). The largest remaining items are the vegetation
+  library (1.1 MB) and the 1K PBR normal maps for grass, stone and rock (~0.3–0.5 MB each);
+  KTX2 textures would cut download and VRAM further.
 
 ## Verified
 

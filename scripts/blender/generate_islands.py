@@ -708,6 +708,7 @@ def place_drapes(terrain, rim, lip, seed):
     Ci = C.inverted()
     n = len(rim)
     blocked = [p["angle"] for p in terrain.ports] + [ch["angle"] for ch in terrain.channels]
+    blocked += [th for th, _ in terrain.spec.get("harbour", [])]
     perim = sum(math.hypot(rim[(j + 1) % n][0] - rim[j][0], rim[(j + 1) % n][1] - rim[j][1]) for j in range(n))
     out = []
     s = rng.uniform(0, 0.4)

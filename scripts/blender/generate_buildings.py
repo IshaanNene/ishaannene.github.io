@@ -681,9 +681,34 @@ def lab(b, x, y, z, w, d, h, rz=0.0, warm=True):
     M = T(x, y, z, rz=rz)
     b.add(bm_box(w + 0.3, d + 0.3, 0.16, 0.02), "concrete_light", M, obj="buildings")
     b.add(bm_box(w, d, h, 0.0), "glass", M @ T(0, 0, 0.16), obj="buildings")
-    if warm:
-        b.add(bm_box(w * 0.5, d * 0.4, 0.5, 0.02), "emit_warm", M @ T(-w * 0.15, 0, 0.16), obj="props", detail=1)
-    b.add(bm_box(w * 0.3, d * 0.3, 0.8, 0.02), "metal", M @ T(w * 0.25, d * 0.1, 0.16), obj="props", detail=1)
+    # interior seen through the glass: a back wall, two rows of benches with screens and instruments,
+    # equipment racks with status lights and ceiling light strips (lit when `warm`)
+    I = M @ T(0, 0, 0.16)
+    rng = random.Random(int(x * 100 + y * 10 + z))
+    b.add(bm_box(w - 0.1, 0.08, h, 0), "concrete_light", I @ T(0, d / 2 - 0.12, 0), obj="buildings")
+    bw = w * 0.58
+    for by in (-d * 0.2, d * 0.1):
+        B = I @ T(-w * 0.12, by, 0)
+        b.add(bm_box(bw, 0.26, 0.27, 0), "metal", B, obj="props", detail=1)
+        b.add(bm_box(bw + 0.04, 0.3, 0.03, 0), "cream", B @ T(0, 0, 0.27), obj="props", detail=1)
+        n = max(2, int(bw / 0.32))
+        for k in range(n):
+            px = (k + 0.5 - n / 2) * bw / n
+            if rng.random() < 0.55:
+                b.add(bm_box(0.17, 0.02, 0.12, 0), "ink", B @ T(px, 0.06, 0.3), obj="props", detail=1)
+                b.add(bm_box(0.15, 0.005, 0.1, 0), "emit_lime" if rng.random() < 0.3 else "window",
+                      B @ T(px, 0.048, 0.31), obj="props", detail=1)
+            else:
+                b.add(bm_box(0.14, 0.12, rng.uniform(0.06, 0.14), 0), rng.choice(["orange", "blue", "cream", "metal_dark"]),
+                      B @ T(px, -0.03, 0.3), obj="props", detail=1)
+    for k, ry in enumerate((-d * 0.12, d * 0.12)):
+        R = I @ T(w / 2 - 0.2, ry, 0)
+        b.add(bm_box(0.24, 0.2, min(0.62, h - 0.12), 0), "metal_dark", R, obj="props", detail=1)
+        for j in range(4):
+            b.add(bm_box(0.012, 0.15, 0.02, 0), "emit_lime", R @ T(-0.122, 0, 0.1 + j * 0.12), obj="props", detail=1)
+    for ly in (-d * 0.2, d * 0.12):
+        b.add(bm_box(w * 0.7, 0.05, 0.02, 0), "emit_warm" if warm else "cream", I @ T(0, ly, h - 0.04), obj="props",
+              detail=1)
     b.add(bm_box(w + 0.5, d + 0.5, 0.18, 0.03), "concrete_light", M @ T(0, 0, 0.16 + h), obj="buildings")
     sx, sy = w, d
     # mullions
@@ -821,10 +846,28 @@ def build_playground(b: Builder, t):
     blocks = [((1.6, 1.2, 0.9), (0, 0), 0.0, "orange"), ((1.2, 1.9, 0.8), (0.2, 0.3), 0.3, "blue"),
               ((2.2, 0.8, 0.7), (-0.3, -0.1), -0.2, "cream"), ((0.9, 0.9, 0.9), (0.3, 0.2), 0.5, "lime")]
     z = sz - 0.05
-    for size, (ox, oy), rz, mat in blocks:
+    rng = random.Random(71)
+    studio = dict(frame="ink", sill=None, bars=1)
+    for i, (size, (ox, oy), rz, mat) in enumerate(blocks):
         b.box(mat, size, (sx + ox, sy + oy, z), rz=rz, bevel=0.05)
-        z += size[2]
-    b.box("glass", (0.6, 0.05, 0.4), (sx - 0.3, sy - 0.62, sz + 0.25), bevel=0.0)
+        BM = T(sx + ox, sy + oy, z, rz=rz)
+        w, d, h = size
+        # each block is a studio: a ribbon of windows on its long faces, a glazed end, a metal coping
+        for F, L in sides(BM, w, d):
+            if L >= 1.0:
+                window_row(b, F, L, h * 0.3, 0.36, h * 0.42, 0.58, rng, lit=0.3, margin=0.2, **studio)
+            else:
+                window(b, F, 0.0, h * 0.22, L - 0.3, h * 0.56, lit=rng.random() < 0.3, bars=2, frame="ink", sill=None)
+        for F, L in sides(BM @ T(0, 0, h), w, d):
+            b.add(bm_box(L + 0.02, 0.06, 0.04, 0), "metal_dark", F @ T(0, 0.02, -0.02), obj="props", detail=1)
+        z += h
+    # roof terrace on the top block: glass railing and a parasol
+    top = sides(T(sx + 0.3, sy + 0.2, z, rz=0.5), 0.9, 0.9)
+    for F, L in top:
+        b.add(bm_box(L - 0.06, 0.02, 0.22, 0), "glass", F @ T(0, 0.04, 0), obj="props", detail=1)
+        b.add(bm_box(L - 0.06, 0.03, 0.02, 0), "metal", F @ T(0, 0.04, 0.22), obj="props", detail=1)
+    b.cyl("metal", 0.015, 0.015, 0.55, (sx + 0.3, sy + 0.2, z), segs=6, obj="props", detail=1)
+    b.add(bm_cyl(0.32, 0.02, 0.12, 12), "orange", T(sx + 0.3, sy + 0.2, z + 0.5), obj="props", detail=1)
     b.occupy(sx, sy, 1.4)
     b.label = Vector((0.3, 0.3, 5.2))
     # cantilever box on a pylon
@@ -835,6 +878,14 @@ def build_playground(b: Builder, t):
     b.box("orange", (2.32, 1.02, 0.14), (cx + 0.5, cy, cz + 1.95), rz=0.5, bevel=0.0)
     b.box("glass", (0.05, 0.8, 0.5), (cx + 0.5 + math.cos(0.5) * 1.16, cy + math.sin(0.5) * 1.16, cz + 1.78), rz=0.5,
           bevel=0.0)
+    CM = T(cx + 0.5, cy, cz + 1.6, rz=0.5)
+    for F, L in sides(CM, 2.3, 1.0, "sn"):
+        window_row(b, F, L, 0.52, 0.42, 0.26, 0.62, random.Random(72), lit=0.35, margin=0.25, frame="ink", sill=None)
+    for F, L in sides(CM @ T(0, 0, 0.9), 2.3, 1.0):
+        b.add(bm_box(L + 0.02, 0.06, 0.04, 0), "metal_dark", F @ T(0, 0.02, -0.02), obj="props", detail=1)
+    # raking steel strut from the pylon to the cantilevered end
+    tip = CM @ Vector((0.95, 0, 0.02))
+    b.beam("metal_dark", (cx, cy, cz + 0.55), tuple(tip), 0.09)
     b.occupy(cx, cy, 1.0)
     # gateway arch over the path from the main bridge
     gx, gy = 3.5, -0.25
@@ -918,11 +969,27 @@ def build_resume(b: Builder, t):
     b.box("concrete_light", (5.4, 3.1, 0.22), (0.0, 1.3, z0 + 2.05), bevel=0.02)
     for x in (-2.2, -0.75, 0.75, 2.2):
         for y in (0.1, 2.5):
-            b.cyl("chrome", 0.06, 0.06, 2.05, (x, y, z0), segs=10)
+            # cruciform chrome columns
+            b.add(bm_box(0.16, 0.035, 2.05, 0), "chrome", T(x, y, z0), obj="buildings")
+            b.add(bm_box(0.035, 0.16, 2.05, 0), "chrome", T(x, y, z0), obj="buildings")
     b.box("stone_dark", (1.7, 0.12, 2.05), (-0.9, 1.4, z0), bevel=0.0)
     b.box("stone_light", (3.0, 0.16, 2.05), (1.1, 2.75, z0), bevel=0.0)
     b.box("glass", (2.4, 0.05, 2.0), (-1.3, 2.2, z0), bevel=0.0)
     b.box("glass", (0.05, 1.6, 2.0), (2.6, 1.4, z0), bevel=0.0)
+    # slim chrome glazing bars round both glass walls
+    for (gx, gy, gw, rzz) in [(-1.3, 2.2, 2.4, 0.0), (2.6, 1.4, 1.6, math.pi / 2)]:
+        G = T(gx, gy, z0, rz=rzz)
+        for xx in (-gw / 2, 0.0, gw / 2):
+            b.add(bm_box(0.04, 0.07, 2.0, 0), "chrome", G @ T(xx, 0, 0), obj="props", detail=1)
+        for zz in (0.0, 1.97):
+            b.add(bm_box(gw, 0.07, 0.03, 0), "chrome", G @ T(0, 0, zz), obj="props", detail=1)
+    # roof: shadow reveal under the slab edge and a grid of downlights in the soffit
+    b.box("concrete_dark", (5.2, 2.9, 0.03), (0.0, 1.3, z0 + 2.02), bevel=0.0, obj="props", detail=1)
+    for x in (-1.6, -0.55, 0.55, 1.6):
+        for y in (0.6, 2.0):
+            b.add(bm_cyl(0.055, 0.055, 0.012, 10), "emit_warm", T(x, y, z0 + 2.005), obj="props", detail=1)
+    for F, L in sides(T(0.0, 1.3, z0 + 2.27), 5.4, 3.1):
+        b.add(bm_box(L + 0.02, 0.05, 0.035, 0), "metal", F @ T(0, 0.015, -0.035), obj="props", detail=1)
     b.box("emit_warm", (1.2, 0.04, 0.12), (-0.9, 1.33, z0 + 1.9), bevel=0.0, detail=1)
     basin(b, "water_reflect", 1.4, -0.1 + 0.0, z0, 2.0, 0.9, h=0.18, mat="stone_mid")
     b.label = Vector((0.0, 1.3, z0 + 4.2))
@@ -987,6 +1054,8 @@ SPEC_CONTACT = {
     "strata": ["stone_light", "stone_mid", "stone_cool", "stone_light", "stone_dark"],
     "sign": (0.4, -4.4, -90 * D2R),
     "veg": {"count": 20, "weights": {"palm": 4, "bush": 2, "rock": 2, "broad_b": 1}},
+    # sky harbour: polar angle and length of each pier; rim greenery stays clear of them
+    "harbour": [(-50 * D2R, 4.6), (-31 * D2R, 3.1)],
 }
 
 
@@ -1075,37 +1144,38 @@ def build_contact(b: Builder, t):
     roof_plant(b, UM @ T(0, 0, 0.95), 1.3, 1.0, seed=51, ph=0, units=1, vents=1, membrane=False)
     b.occupy(ux, uy, 0.9)
 
-    # sky harbour: piers cantilevered off the beach into the void
-    ang = -38 * D2R
-    for k, (off, length) in enumerate([(0.0, 5.0), (1.5, 3.4)]):
-        dirv = Vector((math.cos(ang), math.sin(ang), 0))
+    # sky harbour: piers rooted on the beach just inside the rim, running straight out into the void
+    for k, (th, length) in enumerate(SPEC_CONTACT["harbour"]):
+        dirv = Vector((math.cos(th), math.sin(th), 0))
         side = Vector((-dirv.y, dirv.x, 0))
-        start = Vector((2.2, -2.4, 0)) + side * off + dirv * (0.6 * k)
-        z = 0.32
-        end = start + dirv * length
-        # scanned timber pier sections (1.58 long, deck at z=0, origin at the landward end)
+        start = dirv * (t.r(th) - 0.7)
+        z = t.h(start.x, start.y) + 0.02
+        # scanned timber pier sections (1.5 long, deck at z=0, origin at the landward end)
         sec = 1.5
-        for i in range(max(1, round(length / sec))):
+        n = max(1, round(length / sec))
+        for i in range(n):
             p = start + dirv * (i * sec)
-            b.prop("pier_end" if i % 2 else "pier", p.x, p.y, z + 0.04, ang + math.pi)  # front (-Y) faces land
-        end = start + dirv * (round(length / sec) * sec - 0.4)
-        if k == 0:
-            lamp(b, end.x + side.x * 0.42, end.y + side.y * 0.42, z + 0.04, 1.3, facing=ang)
-            b.prop("lantern", end.x - side.x * 0.42, end.y - side.y * 0.42, z + 0.04, ang)
-        # moored boat (bobbing)
-        bp = start + dirv * (length * 0.65) - side * (1.25 if k == 0 else -1.2)
+            b.prop("pier_end" if i == n - 1 else "pier", p.x, p.y, z + 0.04, th + math.pi)  # front (-Y) faces land
+        end = start + dirv * (n * sec - 0.4)
+        lamp(b, end.x + side.x * 0.42, end.y + side.y * 0.42, z + 0.04, 1.3, facing=th)
+        b.prop("lantern", end.x - side.x * 0.42, end.y - side.y * 0.42, z + 0.04, th)
+        # keep trees and props off the landward end of the pier
+        for d in (-0.6, 0.0, 0.6):
+            q = start + dirv * d
+            b.occupy(q.x, q.y, 0.75)
+        # moored boat bobbing alongside, on the side away from the other pier
+        bp = start + dirv * (n * sec * 0.62) + side * (1.15 if k else -1.15)
         boat = b.separate(f"anim_bob_boat{k}", (bp.x, bp.y, z - 0.25))
         hull = [(-0.9, -0.32), (0.55, -0.34), (1.0, 0.0), (0.55, 0.34), (-0.9, 0.32)]
-        bm = bm_prism(hull, 0.42)
-        b.add(bm, "cream" if k == 0 else "blue", T(bp.x, bp.y, z - 0.55, rz=ang), obj=boat)
-        b.add(bm_prism([(x * 0.9, y * 0.82) for x, y in hull], 0.06), "wood", T(bp.x, bp.y, z - 0.14, rz=ang), obj=boat)
-        b.add(bm_box(0.5, 0.42, 0.32, 0.03), "concrete_light", T(bp.x - dirv.x * 0.25, bp.y - dirv.y * 0.25, z - 0.12, rz=ang),
+        b.add(bm_prism(hull, 0.42), "cream" if k == 0 else "blue", T(bp.x, bp.y, z - 0.55, rz=th), obj=boat)
+        b.add(bm_prism([(x * 0.9, y * 0.82) for x, y in hull], 0.06), "wood", T(bp.x, bp.y, z - 0.14, rz=th), obj=boat)
+        b.add(bm_box(0.5, 0.42, 0.32, 0.03), "concrete_light", T(bp.x - dirv.x * 0.25, bp.y - dirv.y * 0.25, z - 0.12, rz=th),
               obj=boat)
         b.rod("wood_dark", (bp.x + dirv.x * 0.25, bp.y + dirv.y * 0.25, z - 0.1),
               (bp.x + dirv.x * 0.25, bp.y + dirv.y * 0.25, z + 1.6), 0.03, obj=boat)
         b.add(bm_prism([(0, 0), (0.9, 0), (0, 1.3)], 0.02), "cream",
-              T(bp.x + dirv.x * 0.22, bp.y + dirv.y * 0.22, z + 0.2, rz=ang + math.pi, rx=math.pi / 2), obj=boat)
-    b.occupy(2.8, -3.0, 1.4)
+              T(bp.x + dirv.x * 0.22, bp.y + dirv.y * 0.22, z + 0.2, rz=th + math.pi, rx=math.pi / 2), obj=boat)
+    ang = -40 * D2R  # boathouse doors face the harbour
     # boathouse
     bx, by = 0.3, -3.6
     bz = t.h(bx, by)
