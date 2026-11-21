@@ -1187,7 +1187,8 @@ def build_contact(b: Builder, t):
     window(b, sides(BM, 1.4, 1.1, "s")[0][0], 0.1, 0.42, 0.34, 0.26, frame="wood_dark", sill="wood_dark")
     b.occupy(bx, by, 0.9)
     # contact signboards
-    for (x, y) in [(-1.1, -0.9), (0.6, -1.4), (2.3, -0.8)]:
+    # front row of three, back row of two in the gaps between them
+    for (x, y) in [(-1.1, -0.9), (0.6, -1.4), (2.3, -0.8), (-0.25, 0.5), (1.5, 0.6)]:
         b.slot(x, y, t.h(x, y), -95 * D2R, kind="contact")
         b.occupy(x, y, 0.45)
     for (x, y) in [(-4.8, 2.2), (4.8, 3.4), (-1.0, 4.8), (5.4, -1.6)]:
