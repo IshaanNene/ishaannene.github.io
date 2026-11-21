@@ -138,12 +138,17 @@ These are intentionally procedural so they can be generated from Markdown:
     256 px (2.1 MB → 0.96 MB); the budgets live in the `assets:cliffs` / `assets:props` scripts.
   - `node scripts/optimize-glb.mjs --force <folder>` recompresses just the named folders.
 
-## 3. Placeholder content and copy (replace with real material)
+## 3. Content
 
-- `src/config/site.ts`: role, bio, principles and the email address
-  (`hello@example.com`) are placeholders. The GitHub link is real.
-- All Markdown in `content/`: 5 blogs, 5 projects, 4 research, 4 playground and
-  4 resume entries, each marked *Placeholder*.
+- Real content from github.com/IshaanNene, each entry linking its repository:
+  7 projects, 4 research projects, 4 playground experiments, and 5 blog posts that are factual
+  write-ups of the larger projects (drawn from their READMEs, with their measured numbers and
+  stated limitations).
+- `src/config/site.ts`: bio and principles drawn from the profile and READMEs; contact has
+  email, GitHub, LinkedIn, LeetCode and Kaggle. The Contact island has five signboard slots
+  (front row of three, back row of two).
+- **Still placeholder:** the 4 resume entries (`content/resume/`), awaiting real role, dates
+  and degree details.
 - Content objects use Cinzel, Bangers, Archivo Black and Fredoka. Generic labels still
   use three.js sample typefaces (Helvetiker, Droid, Optimer).
 - No social preview image (`og:image`) yet.
@@ -167,12 +172,12 @@ These are intentionally procedural so they can be generated from Markdown:
 - Clicking a 3D content object opens its page; headers match material and typography.
 - Every destination page renders a live 3D hero of its island.
 - Mobile: menu, camera buttons, bottom panel with the island framed above it.
-- `npm run build` statically generates all 28 routes. `out/` served locally works with compressed models.
+- `npm run build` statically generates every route. `out/` served locally works with compressed models.
+- GitHub Pages deployment: PRs #1–#3 deployed and the live site renders.
 - WebGL-unavailable and renderer-crash paths fall back to an HTML destination list.
 
 ## Not yet verified
 
-- Deployment on GitHub Pages (workflow rewritten, not pushed).
 - Real low-end mobile hardware; only emulated in a desktop browser.
 - Real frame rate. The QA browser throttled every WebGL canvas, including a bare
   `clear()` test, to about 1 fps, so frame timing must be measured in a normal browser window.
